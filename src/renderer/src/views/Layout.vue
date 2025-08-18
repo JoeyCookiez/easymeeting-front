@@ -1,5 +1,6 @@
 <template>
-    <div>
+    <div >
+        layout
         <router-view />
     </div>
 </template>
