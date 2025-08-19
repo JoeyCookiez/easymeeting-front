@@ -1,13 +1,5 @@
 <template>
     <div class="home-container">
-        <div class="window-header">
-            <div class="title">EasyMeeting</div>
-            <div class="window-controls">
-                <button class="control-btn min-btn" @click="minimizeWindow">─</button>
-                <button class="control-btn close-btn" @click="handleClose">×</button>
-            </div>
-        </div>
-
         <div class="content">
             <div class="left-panel">
                 <div class="features-grid">
@@ -52,14 +44,6 @@ const router = useRouter()
 
 const go = (routePath) => {
     router.push(routePath)
-}
-
-const minimizeWindow = () => {
-    window.electron?.ipcRenderer?.send('minimize-window')
-}
-
-const handleClose = () => {
-    window.electron?.ipcRenderer?.send('show-close-dialog')
 }
 
 const featureItems = ref([

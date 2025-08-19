@@ -22,7 +22,10 @@
             </div>
         </div>
         <div class="main-content">
-            <router-view />
+            <TitleBar />
+            <div class="content-body">
+                <router-view />
+            </div>
         </div>
     </div>
     
@@ -31,6 +34,7 @@
 <script setup>
 import { VideoCamera, User, VideoPlay, Setting } from '@element-plus/icons-vue'
 import { useRouter, useRoute } from 'vue-router'
+import TitleBar from '@/components/TitleBar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -123,6 +127,13 @@ const isActive = (path) => route.path === path
         flex: 1;
         overflow: hidden;
         background: #fff;
+        display: flex;
+        flex-direction: column;
+        .content-body {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
     }
 }
 </style>
