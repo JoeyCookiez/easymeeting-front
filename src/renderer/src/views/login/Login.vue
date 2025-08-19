@@ -148,7 +148,7 @@ const handleSubmit = async() => {
             return
         }
         userInfoStore.setInfo(res.data)
-        await window.electron.ipcRenderer.invoke("onLoginSuccess")
+        await window.electron.ipcRenderer.invoke("onLoginSuccess",res.data,import.meta.env.VITE_WS)
         router.push("/home")
         return
         

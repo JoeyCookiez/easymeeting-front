@@ -22,9 +22,11 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.11.0",
+    "electron-store": "^10.1.0",
     "element-plus": "^2.10.7",
     "pinia": "^3.0.3",
-    "vue-router": "^4.5.1"
+    "vue-router": "^4.5.1",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config": "^2.0.0",
