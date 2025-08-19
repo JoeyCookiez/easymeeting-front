@@ -23,7 +23,18 @@ const onLoginOrRegister = () => {
         mainWindow.setResizable(false)
     })
 }
+const onLoginSuccess = () => {
+    ipcMain.handle("onLoginSuccess", (e) => {
+        const mainWindow = getWindow("main")
+        const width = 800
+        const height = 600
+        mainWindow.setSize(width, height)
+        mainWindow.setMinimumSize(width, height)
+        mainWindow.setResizable(true)
+    })
+}
 
 export {
-    onLoginOrRegister
+    onLoginOrRegister,
+    onLoginSuccess
 }

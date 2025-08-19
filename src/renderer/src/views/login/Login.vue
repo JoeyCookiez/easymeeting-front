@@ -134,7 +134,7 @@ const handleSubmit = async() => {
     // 表单提交逻辑
 
     console.log('提交表单', formData.value);
-    if (isLogin.value) {
+    if (isLogin) {
         // 登录
         const { email, password } = formData.value
         const param = {
@@ -148,6 +148,7 @@ const handleSubmit = async() => {
             return
         }
         userInfoStore.setInfo(res.data)
+        await window.electron.ipcRenderer.invoke("onLoginSuccess")
         router.push("/home")
         return
         
@@ -158,15 +159,9 @@ const handleSubmit = async() => {
             ElMessage.error("两次输入密码不一致！")
             return
         }
-        const param = { ...formData.value, checkCodeKey: curCheckCodeUUID.value }
-        const res = await register(param)
-        if(res.code != 200){
-            ElMessage.error("注册失败"+ res?.message)
-        }else{
-            ElMessage.success("注册成功")
-        }
-        isLogin.value = !isLogin.value
-        return
+        const param = { ...formData.value, checkCodeKey: curCheckCodeUUID }
+        // const res = await register(param)
+        
     }
 
 };
