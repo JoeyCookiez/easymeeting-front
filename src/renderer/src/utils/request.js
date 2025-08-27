@@ -1,5 +1,6 @@
 import axios from "axios";
 import { ElLoading, ElMessage } from "element-plus";
+import { useUserInfoStore } from "../stores/UserInfoStore";
 
 let loading = null;
 // console.log(import.meta.env.PROD,import.meta.env.VITE_DOMAIN)
@@ -12,6 +13,32 @@ const instance = axios.create({
 // 请求拦截器
 instance.interceptors.request.use(
     (config) => {
+        // 优先从 Pinia 获取 userInfo，其次从 localStorage 兜底
+        try {
+            const userStore = useUserInfoStore?.()
+            const piniaUserInfo = userStore?.userInfo
+            let token = piniaUserInfo?.token
+            if (!token) {
+                const cached = localStorage.getItem("userInfo")
+                if (cached) {
+                    try {
+                        const parsed = JSON.parse(cached)
+                        token = parsed?.token
+                    } catch (e) {
+                        // ignore json parse error
+                    }
+                }
+            }
+            if (token) {
+                config.headers = config.headers || {}
+                // 常见写法：Bearer <token>；可按后端要求调整
+                if (!config.headers.Authorization) {
+                    config.headers.Authorization = token
+                }
+            }
+        } catch (e) {
+            // 在非组件上下文或 Pinia 未初始化时，try/catch 防御
+        }
         if (config.showLoading) {
             loading = ElLoading.service({
                 lock: true,

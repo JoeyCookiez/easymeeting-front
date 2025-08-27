@@ -12,6 +12,7 @@ export const useUserInfoStore = defineStore("userInof",{
             localStorage.setItem("userInfo",JSON.stringify(userInfo))
         },
         getInfo(){
+            // const userInfo_ =  localStorage.getItem('userInfo')
             return this.userInfo
         }
     }

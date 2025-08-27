@@ -1,5 +1,6 @@
 import WebSocket from "ws";
-import { getWindow, getWindowMange } from "./windowProxy";
+import { getMainWindow, getWindow, getWindowMange } from "./windowProxy";
+import { updateSharedState } from "./sharedState";
 
 let ws = null
 const maxRetries = 5
@@ -9,7 +10,7 @@ const retryInterval = 1000
 let heartBeatTimer = null
 let wsUrl = null
 let needReconnect = false
-
+let memberList = []
 const initWs = (_wsUrl) => {
     wsUrl = _wsUrl
     needReconnect = true
@@ -40,9 +41,32 @@ const connectWs = () => {
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data)
         console.log("收到消息:", data)
+        const { messageType, messageContent } = data
+        
+        // 向所有窗口广播消息（包括主窗口和会议室窗口）
+        const windows = getWindowMange()
+        for (const key in windows) {
+            try {
+                windows[key]?.webContents?.send("ws-message", data)
+            } catch (e) {
+                console.log(`向窗口 ${key} 发送消息失败:`, e.message)
+            }
+        }
+        
+        switch (messageType) {
+            case 1:
+                // 加入会议情况
+                const { meetingMemberList } = messageContent
+                updateSharedState({
+                    memberList: meetingMemberList
+                })
+                break
+            default:
+                break
+        }
     }
     ws.onerror = () => {
-        try { ws?.close() } catch {}
+        try { ws?.close() } catch { }
     }
 
     ws.onclose = () => {
@@ -104,7 +128,7 @@ const logout = (closeWs = true) => {
     mainWindow.setResizable(false)
     if (closeWs) {
         needReconnect = false
-        try { ws?.close() } catch {}
+        try { ws?.close() } catch { }
     }
     const windows = getWindowMange()
     for (let winKey in windows) {
@@ -126,5 +150,5 @@ const sendWSData = (data) => {
 export {
     initWs,
     logout,
-    sendWSData
+    sendWSData,
 }

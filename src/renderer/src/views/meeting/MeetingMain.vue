@@ -3,7 +3,8 @@
         <div class="content">
             <div class="left-panel">
                 <div class="features-grid">
-                    <div class="feature-card" v-for="item in featureItems" :key="item.route" @click="go(item.route)">
+                    <div class="feature-card" v-for="item in featureItems" :key="item.route"
+                        @click="handleFeatureClick(item)">
                         <div class="feature-title">{{ item.label }}</div>
                         <div class="feature-desc">{{ item.desc }}</div>
                     </div>
@@ -33,17 +34,129 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- 加入会议对话框 -->
+    <el-dialog v-model="showJoinDialog" width="520px" :show-close="false" append-to-body class="join-meeting-dialog">
+        <template #header>
+            <div class="dialog-header">
+                <div class="title">加入会议</div>
+                <div class="window-controls">
+                    <button class="control-btn min-btn" @click="minimizeJoinDialog">─</button>
+                    <button class="control-btn close-btn" @click="closeJoinDialog">×</button>
+                </div>
+            </div>
+        </template>
+
+        <div class="dialog-body">
+            <el-form label-width="86px" class="form-area">
+                <el-form-item label="会议号">
+                    <el-input v-model="joinForm.meetingNo" placeholder="请输入会议号或链接" />
+                </el-form-item>
+                <el-form-item label="入会名称">
+                    <el-input v-model="joinForm.nickName" placeholder="请输入您的名称" />
+                </el-form-item>
+                <el-form-item label="会议密码">
+                    <el-input v-model="joinForm.password" placeholder="请输入您的会议密码" />
+                </el-form-item>
+            </el-form>
+
+            <div class="meeting-settings">
+                <div class="setting-item">
+                    <span class="label">入会时开始摄像头</span>
+                    <el-switch v-model="joinForm.videoOpen" />
+                </div>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="dialog-footer">
+                <el-button type="primary" @click="confirmJoinMeeting"
+                    :disabled="!joinForm.meetingNo || !joinForm.nickName">加入会议</el-button>
+            </div>
+        </template>
+    </el-dialog>
+
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { joinMeeting, preJoinMeeting } from '../../api/meeting'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 
-const go = (routePath) => {
-    router.push(routePath)
+const showJoinDialog = ref(false)
+const joinForm = ref({
+    meetingNo: '123456789',
+    nickName: '',
+    videoOpen: false,
+    password: ''
+})
+
+const handleFeatureClick = (item) => {
+    if (item.route === '/joinMeeting') {
+        showJoinDialog.value = true
+        return
+    }
+    router.push(item.route)
+}
+
+const minimizeJoinDialog = () => {
+    showJoinDialog.value = false
+}
+
+const closeJoinDialog = () => {
+    showJoinDialog.value = false
+}
+
+const confirmJoinMeeting = async() => {
+    // TODO: 接入实际加入会议逻辑
+    showJoinDialog.value = false
+    const preJoinRes = await preJoinMeeting(joinForm.value)
+    if(preJoinRes.code != 200){
+        ElMessage.error(preJoinRes?.message)
+        return
+    }
+    const joinRes = await joinMeeting({
+        videoOpen: joinForm.value?.videoOpen ? '1' : '0'
+    })
+    if(joinRes.code != 200){
+        ElMessage.error(joinRes?.message)
+        return
+    }
+    // 打开会议室新窗口（不可用则回退到路由导航）
+    // try {
+    //     if (window.api?.openMeetingWindow) {
+    //         await window.api.openMeetingWindow({
+    //             meetingId: joinForm.value.meetingNo,
+    //             nickName: joinForm.value.nickName,
+    //             video: joinForm.value.videoOpen
+    //         })
+    //     } else {
+    //         router.push({
+    //             path: `/meetingRoom/${encodeURIComponent(joinForm.value.meetingNo)}`,
+    //             query: {
+    //                 nickName: joinForm.value.nickName,
+    //                 video: joinForm.value.videoOpen ? '1' : '0'
+    //             }
+    //         })
+    //     }
+    // } catch (e) {
+    //     ElMessage.error('打开会议窗口失败，已回退到当前窗口显示')
+    //     router.push({
+    //         path: `/meetingRoom/${encodeURIComponent(joinForm.value.meetingNo)}`,
+    //         query: {
+    //             nickName: joinForm.value.nickName,
+    //             video: joinForm.value.videoOpen ? '1' : '0'
+    //         }
+    //     })
+    // }
+    await window.electron.ipcRenderer.invoke("openMeetingWindow",{
+        meetingId: joinForm.value.meetingNo,
+        nickName: joinForm.value.nickName,
+        video: joinForm.value.videoOpen
+    })
 }
 
 const featureItems = ref([
@@ -60,7 +173,7 @@ onMounted(() => {
 
 const month = computed(() => now.value.getMonth() + 1)
 const day = computed(() => now.value.getDate())
-const weekText = computed(() => ['周日','周一','周二','周三','周四','周五','周六'][now.value.getDay()])
+const weekText = computed(() => ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.value.getDay()])
 
 const meetingList = ref([
     { id: 1, title: '团队例会', time: '10:00 - 11:00', status: '进行中' },
@@ -110,9 +223,19 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
                 align-items: center;
                 justify-content: center;
 
-                &:hover { background: rgba(0, 0, 0, 0.12); }
-                &.close-btn:hover { background: #ff5f56; color: #fff; }
-                &.min-btn:hover { background: #ffbd2e; color: #fff; }
+                &:hover {
+                    background: rgba(0, 0, 0, 0.12);
+                }
+
+                &.close-btn:hover {
+                    background: #ff5f56;
+                    color: #fff;
+                }
+
+                &.min-btn:hover {
+                    background: #ffbd2e;
+                    color: #fff;
+                }
             }
         }
     }
@@ -141,11 +264,11 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
             padding: 16px;
             cursor: pointer;
             transition: transform .15s ease, box-shadow .15s ease;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 
             &:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
             }
 
             .feature-title {
@@ -154,6 +277,7 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
                 color: #1f2d3d;
                 margin-bottom: 6px;
             }
+
             .feature-desc {
                 font-size: 12px;
                 color: #606266;
@@ -171,8 +295,9 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
             background: #fff;
             border-radius: 10px;
             padding: 14px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
             margin-bottom: 12px;
+
             .date-text {
                 font-size: 18px;
                 font-weight: 700;
@@ -184,8 +309,11 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
             background: #fff;
             border-radius: 10px;
             padding: 12px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            & + .meeting-section { margin-top: 12px; }
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+
+            &+.meeting-section {
+                margin-top: 12px;
+            }
 
             .section-title {
                 font-size: 14px;
@@ -193,22 +321,125 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
                 color: #409eff;
                 margin-bottom: 8px;
             }
+
             .empty {
                 font-size: 12px;
                 color: #909399;
             }
+
             .meeting-item {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
                 padding: 8px 0;
                 border-bottom: 1px dashed #eee;
-                &:last-child { border-bottom: none; }
-                .name { font-size: 13px; color: #303133; }
-                .time { font-size: 12px; color: #909399; }
-                &.running .name { color: #67c23a; }
+
+                &:last-child {
+                    border-bottom: none;
+                }
+
+                .name {
+                    font-size: 13px;
+                    color: #303133;
+                }
+
+                .time {
+                    font-size: 12px;
+                    color: #909399;
+                }
+
+                &.running .name {
+                    color: #67c23a;
+                }
             }
         }
     }
+}
+
+.join-meeting-dialog {
+    :deep(.el-dialog__header) {
+        padding: 0 0 12px 0;
+    }
+
+    :deep(.el-dialog__headerbtn) {
+        display: none;
+    }
+}
+
+.dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid #f0f0f0;
+
+    .title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .window-controls {
+        display: flex;
+        gap: 6px;
+
+        .control-btn {
+            width: 22px;
+            height: 22px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.08);
+            color: #333;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            &:hover {
+                background: rgba(0, 0, 0, 0.12);
+            }
+
+            &.close-btn:hover {
+                background: #ff5f56;
+                color: #fff;
+            }
+
+            &.min-btn:hover {
+                background: #ffbd2e;
+                color: #fff;
+            }
+        }
+    }
+}
+
+.dialog-body {
+    padding: 12px 8px 0 8px;
+}
+
+.form-area {
+    max-width: 100%;
+}
+
+.meeting-settings {
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: #f7f9fc;
+    border-radius: 8px;
+
+    .setting-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        .label {
+            font-size: 13px;
+            color: #303133;
+        }
+    }
+}
+
+.dialog-footer {
+    padding-top: 0;
 }
 </style>

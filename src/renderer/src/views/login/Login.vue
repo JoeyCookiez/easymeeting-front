@@ -97,9 +97,9 @@ onMounted(() => {
     // renderCheckCode()
 })
 const formData = ref({
-    email: '',
+    email: 'yyg@163.com',
     nickName: '',
-    password: '',
+    password: '123456',
     rePassword: '',
     checkCode: ''
 })
@@ -132,9 +132,8 @@ const handleClose = () => {
 
 const handleSubmit = async() => {
     // 表单提交逻辑
-
-    console.log('提交表单', formData.value);
-    if (isLogin) {
+    console.log('提交表单', formData.value,'isLogin',isLogin.value);
+    if (isLogin.value) {
         // 登录
         const { email, password } = formData.value
         const param = {
@@ -159,9 +158,12 @@ const handleSubmit = async() => {
             ElMessage.error("两次输入密码不一致！")
             return
         }
-        const param = { ...formData.value, checkCodeKey: curCheckCodeUUID }
-        // const res = await register(param)
-        
+        const param = { ...formData.value, checkCodeKey: curCheckCodeUUID.value }
+        const res = await register(param)
+        if(res.code == 200){
+            ElMessage.success("注册成功")
+        }
+        isLogin.value = ! isLogin.value
     }
 
 };

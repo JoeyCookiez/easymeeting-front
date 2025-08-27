@@ -1,8 +1,11 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
-const api = {}
+const api = {
+  openMeetingWindow: (payload) => ipcRenderer.invoke('openMeetingWindow', payload),
+  meetingWindowControl: (action) => ipcRenderer.send('meeting-window-control', action)
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
@@ -11,6 +14,18 @@ if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
+    // 共享状态：renderer 通过 invoke 与主进程交互
+    contextBridge.exposeInMainWorld('shared', {
+      get: () => ipcRenderer.invoke('shared:get'),
+      set: (next) => ipcRenderer.invoke('shared:set', next),
+      update: (patch) => ipcRenderer.invoke('shared:update', patch)
+    })
+    contextBridge.exposeInMainWorld('electronAPI', {
+      // 监听WebSocket消息
+      onWsMessage: (callback) => ipcRenderer.on("ws-message", (event,data)=>callback(data)),
+      getGlobalData:()=> global.globalData,
+      setGlobalData:(data) =>{global.globalData = data}
+    });
   } catch (error) {
     console.error(error)
   }
@@ -23,5 +38,7 @@ contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
     send: (channel, data) => ipcRenderer.send(channel, data),
     invoke: (channel, data) => ipcRenderer.invoke(channel, data)
-  }
+  },
+
 });
+
