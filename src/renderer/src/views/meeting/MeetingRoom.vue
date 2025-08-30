@@ -53,11 +53,13 @@
 				<div class="grid" :class="gridType">
 					<div class="video-card self" :class="{ muted: isMuted || !micAvailable, cameraOff: !cameraOn }">
 						<div class="avatar" v-if="!cameraOn">{{ avatarInitial }}</div>
-						<video v-else autoplay muted playsinline></video>
+						<video v-else autoplay muted playsinline ref="localVideo"></video>
 						<div class="name-tag">{{ nickName || '我' }}</div>
 					</div>
 					<div class="video-card" v-for="member in filteredMemberList">
-						<div class="avatar">{{ avatarInitial }}</div>
+						<div class="avatar" v-if="!member.cameraOn">{{ avatarInitial }}</div>
+						<video v-else autoplay playsinline :id="`video-${member.userId}`"
+							@loadedmetadata="handleVideoLoaded($event, member.userId)"></video>
 						<div class="name-tag">{{ member?.nickName }}</div>
 					</div>
 					<!-- <div class="video-card placeholder" v-for="n in 3" :key="n">
@@ -91,7 +93,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import { useUserInfoStore } from '../../stores/UserInfoStore'
 const userStore = useUserInfoStore()
 const route = useRoute()
@@ -129,6 +131,10 @@ const videoTrack = ref(null)
 const filteredMemberList = computed(() => {
 	return curMemberList.value.filter(member => member.userId !== userInfo?.userId);
 });
+const handleVideoLoaded = (event, userId) => {
+	const video = event.target
+	video.play().catch(e => console.log(`${userId} 用户视频显示失败`, e))
+}
 // 管理本地媒体流
 const manageMediaTracks = async () => {
 	// 清理现有轨道
@@ -151,12 +157,17 @@ const manageMediaTracks = async () => {
 		if (microOn.value || cameraOn.value) {
 			const stream = await navigator.mediaDevices.getUserMedia(constraints)
 			localStream.value = stream
-
+			if (localVideo.value) {
+				localVideo.value.srcObject = stream
+			}
 			// 获取并存储轨道
 			audioTrack.value = stream.getAudioTracks()[0] || null
 			videoTrack.value = stream.getVideoTracks()[0] || null
 		} else {
 			localStream.value = null
+			if (localVideo.value) {
+				localVideo.value.srcObject = null
+			}
 		}
 
 		// 更新所有peerConnection
@@ -177,6 +188,7 @@ const manageMediaTracks = async () => {
 }
 const updateAllPeerConnections = () => {
 	peerConnectionMap.forEach((peerConnection, userId) => {
+		console.log(`${userId} peerConnection`,peerConnection)
 		updatePeerConnectionTracks(peerConnection)
 	})
 }
@@ -191,10 +203,13 @@ const updatePeerConnectionTracks = (peerConnection) => {
 
 	// 添加当前的音视频轨道
 	if (audioTrack.value) {
+		console.log("音频流正常获取 audioTrack",audioTrack.value,localStream.value)
 		peerConnection.addTrack(audioTrack.value, localStream.value)
 	}
 	if (videoTrack.value) {
+		console.log("视频流正常获取 videoTrack",videoTrack.value ,localStream.value)
 		peerConnection.addTrack(videoTrack.value, localStream.value)
+		console.log("视频流添加到peerConnection成功")
 	}
 }
 const createPeerConnection = (member, cameraEnable, micEnable, userId) => {
@@ -233,6 +248,10 @@ const createPeerConnection = (member, cameraEnable, micEnable, userId) => {
 	peerConnection.ontrack = (event) => {
 		console.log('ontrack', event)
 		// 通过document.selectById获取dom然后通过.srcObject显示视频
+		const videoElement = document.getElementById(`video-${member.userId}`)
+		if (videoElement && event.streams && event.streams[0]) {
+			videoElement.srcObject = event.streams[0]
+		}
 	}
 	// 替换原有的 oniceconnectionstatechange 监听器
 	peerConnection.onconnectionstatechange = () => {
@@ -250,11 +269,13 @@ const createPeerConnection = (member, cameraEnable, micEnable, userId) => {
 	};
 	// 当本地 ICE 代理的 “候选者收集状态” 发生变化时触发，用于监控候选者的收集进度
 	peerConnection.onicegatheringstatechange = (event) => {
-		peerConnectionMap.set(member.userId, peerConnection)
+		// peerConnectionMap.set(member.userId, peerConnection)
 		// 为peerConnection添加音视频轨道
-		localStream.getTracks().forEach(track => {
-			peerConnection.addTrack(track, localStream)
-		})
+		if (localStream.value) {
+			localStream.value.getTracks().forEach(track => {
+				peerConnection.addTrack(track, localStream.value)
+			})
+		}
 	}
 	peerConnectionMap.set(member?.userId, peerConnection)
 	return peerConnection
@@ -281,7 +302,29 @@ const changeLayout = (type) => {
 	gridType.value = type
 	isPop.value = false
 }
+const createGroupPeerConnection = async(memberList) => {
+	for (const member of memberList) {
+		if (member?.userId !== userInfo?.userId) {
+			try {
+				// 让加入会议的成员与会议中的其他成员建立对等连接
+				const peerConnection = createPeerConnection(member, 0, 0, userInfo?.userId)
+				updatePeerConnectionTracks(peerConnection)
+				// 发送offer请求
+				const offer = await peerConnection.createOffer()
+				await peerConnection.setLocalDescription(offer)
 
+				sendPeerMessage({
+					sendUserId: userInfo?.userId,
+					signalType: SIGNAL_TYPE_OFFER,
+					signalData: offer,
+					receiveUserId: member?.userId,
+				})
+			} catch (error) {
+				console.error('为成员创建 offer 时出错:', error)
+			}
+		}
+	}
+}
 onMounted(async () => {
 	timer = setInterval(() => {
 		durationText.value = formatDuration(Date.now() - startAt)
@@ -302,8 +345,37 @@ onMounted(async () => {
 		// 在这里处理消息，例如更新UI、触发业务逻辑等
 		// handleMessage(message);
 		const msgJson = typeof message == 'object' ? message : JSON.parse(message)
-		const { messageType, sendUserId, receiveUserId } = msgJson
+		const { messageType, sendUserId, receiveUserId, messageContent } = msgJson
 		switch (messageType) {
+			case 1:
+				// 新增用户了
+				// const {messageContent} = msgJson
+				curMemberList.value = messageContent?.meetingMemberList
+				// 新增用户不是自己则与其建立对等连接
+				if (messageContent?.newMember?.userId !== userInfo?.userId) {
+					try {
+						// 让加入会议的成员与会议中的其他成员建立对等连接
+						const peerConnection = createPeerConnection(member, 0, 0, userInfo?.userId)
+						updatePeerConnectionTracks(peerConnection)
+						// 发送offer请求
+						const offer = await peerConnection.createOffer()
+						await peerConnection.setLocalDescription(offer)
+
+						sendPeerMessage({
+							sendUserId: userInfo?.userId,
+							signalType: SIGNAL_TYPE_OFFER,
+							signalData: offer,
+							receiveUserId: member?.userId,
+						})
+					} catch (error) {
+						console.error('为成员创建 offer 时出错:', error)
+					}
+				}
+				ElNotification({
+					title: '有新的成员加入',
+					message: `${messageContent?.newMember?.nickName} 加入会议`
+				})
+				break
 			case 2:
 				// peer消息
 				// 如果是自己发送的，跳过处理
@@ -312,7 +384,7 @@ onMounted(async () => {
 					break
 				}
 
-				const { messageContent } = msgJson
+				// const { messageContent } = msgJson
 				const peerType = messageContent?.signalType
 				const remotePeerConnection = peerConnectionMap.get(sendUserId)
 				if (!remotePeerConnection) {
@@ -382,27 +454,7 @@ onMounted(async () => {
 	// 	localVideo.value.srcObject = stream
 	// })
 	// 为每个成员创建 PeerConnection
-	for (const member of memberList) {
-		if (member?.userId !== userInfo?.userId) {
-			try {
-				// 让加入会议的成员与会议中的其他成员建立对等连接
-				const peerConnection = createPeerConnection(member, 0, 0, userInfo?.userId)
-				updatePeerConnectionTracks(peerConnection)
-				// 发送offer请求
-				const offer = await peerConnection.createOffer()
-				await peerConnection.setLocalDescription(offer)
-
-				sendPeerMessage({
-					sendUserId: userInfo?.userId,
-					signalType: SIGNAL_TYPE_OFFER,
-					signalData: offer,
-					receiveUserId: member?.userId,
-				})
-			} catch (error) {
-				console.error('为成员创建 offer 时出错:', error)
-			}
-		}
-	}
+	createGroupPeerConnection(memberList)
 	// 创建peerConnection
 	// 用户作为新加入的成员，需要与在会议中的所有成员建立peerConnection
 
@@ -566,6 +618,8 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	-webkit-app-region: drag;
 
 	.left {
+		width: 250px;
+
 		.title {
 			font-size: 14px;
 			font-weight: 700;
