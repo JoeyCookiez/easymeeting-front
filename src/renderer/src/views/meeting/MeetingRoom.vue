@@ -8,17 +8,17 @@
 			</div>
 			<div class="mid-bar">
 				<div class="layout">
-					<span class="layout-region">
+					<span class="layout-region" @click="toggleBubble">
 						<img src="../../assets/icons/layout.png"></img>
 						<p>布局</p>
 					</span>
 				</div>
 				<div v-if="isPop" class="bubble">
-					<div>
+					<div @click="changeLayout('four')">
 						<img src="../../assets/icons/fourGrid.png"></img>
 						<p>四宫格</p>
 					</div>
-					<div>
+					<div @click="changeLayout('nine')">
 						<img src="../../assets/icons/nineGrid.png"></img>
 						<p>九宫格</p>
 					</div>
@@ -50,17 +50,16 @@
 		<!-- 主体：视频网格 -->
 		<div class="content">
 			<div class="video-area">
-				<div class="grid">
-					<div class="video-card" v-for="member in curMemberList">
-						<div class="avatar">{{ avatarInitial }}</div>
-						<div class="name-tag">{{ member?.nickName }}</div>
-					</div>
-
-					<!-- <div class="video-card self" :class="{ muted: isMuted || !micAvailable, cameraOff: !cameraOn }">
+				<div class="grid" :class="gridType">
+					<div class="video-card self" :class="{ muted: isMuted || !micAvailable, cameraOff: !cameraOn }">
 						<div class="avatar" v-if="!cameraOn">{{ avatarInitial }}</div>
 						<video v-else autoplay muted playsinline></video>
 						<div class="name-tag">{{ nickName || '我' }}</div>
-					</div> -->
+					</div>
+					<div class="video-card" v-for="member in filteredMemberList">
+						<div class="avatar">{{ avatarInitial }}</div>
+						<div class="name-tag">{{ member?.nickName }}</div>
+					</div>
 					<!-- <div class="video-card placeholder" v-for="n in 3" :key="n">
 						<div class="avatar">N{{ n }}</div>
 						<div class="name-tag">参会者 {{ n }}</div>
@@ -100,13 +99,15 @@ const router = useRouter()
 const curMemberList = ref([])
 const meetingId = computed(() => route.params.meetingId)
 const nickName = computed(() => route.query.nickName || '')
-
+const localStream = ref(null)
 const isMuted = ref(false)
 const cameraOn = ref(route.query.video === '1')
 const microOn = ref(route.query.micro === '1')
 const localVideo = ref(null)
 const recording = ref(false)
-const isPop = ref(true)
+const isPop = ref(false)
+const gridType = ref('four')
+const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {}
 // 会议时长
 const startAt = Date.now()
 const durationText = ref('00:00:00')
@@ -124,6 +125,10 @@ const SIGNAL_TYPE_ANSWER = 'answer'
 const SIGNAL_TYPE_CANDIDATE = 'candidate'
 const audioTrack = ref(null)
 const videoTrack = ref(null)
+// 在 script 部分
+const filteredMemberList = computed(() => {
+	return curMemberList.value.filter(member => member.userId !== userInfo?.userId);
+});
 // 管理本地媒体流
 const manageMediaTracks = async () => {
 	// 清理现有轨道
@@ -269,7 +274,13 @@ const sendPeerMessage = (params) => {
 	// 发送到主进程的"sendPeerConnection"通道
 	window.electron.ipcRenderer.send('sendPeerConnection', formattedData);
 };
-
+const toggleBubble = () => {
+	isPop.value = !isPop.value
+}
+const changeLayout = (type) => {
+	gridType.value = type
+	isPop.value = false
+}
 
 onMounted(async () => {
 	timer = setInterval(() => {
@@ -285,6 +296,7 @@ onMounted(async () => {
 	const { memberList } = state
 	console.log("成员列表", memberList)
 	curMemberList.value = memberList
+
 	window.electronAPI.onWsMessage(async (message) => {
 		console.log('收到WebSocket消息:', message);
 		// 在这里处理消息，例如更新UI、触发业务逻辑等
@@ -452,6 +464,98 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	color: #fff;
 }
 
+.bubble {
+	position: absolute;
+	top: 100%;
+	/* 在布局按钮下方 */
+	right: 0;
+	width: 120px;
+	height: 80px;
+	background-color: white;
+	padding: 20px;
+	z-index: 1;
+	color: #0f1114;
+	border-radius: 8px;
+	justify-content: space-between;
+	display: flex;
+	margin-top: 10px;
+	/* 与按钮的间距 */
+
+	/* 添加向上的三角尖 */
+	&::before {
+		content: '';
+		position: absolute;
+		top: -10px;
+		/* 三角尖位于气泡上方 */
+		right: 20px;
+		/* 与布局按钮对齐 */
+		width: 0;
+		height: 0;
+		border-left: 10px solid transparent;
+		border-right: 10px solid transparent;
+		border-bottom: 10px solid white;
+		/* 与气泡背景色相同 */
+	}
+
+	/* 气泡内容样式 */
+	div {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+
+		img {
+			width: 50px;
+			height: 50px;
+		}
+
+		p {
+			margin-top: 5px;
+			font-size: 12px;
+		}
+	}
+}
+
+.mid-bar {
+	position: relative;
+	display: flex;
+	flex-direction: row;
+	width: 100%;
+
+	.layout {
+		margin-left: auto;
+		display: flex;
+		align-items: center;
+		margin-right: 20px;
+		position: relative;
+		/* 为气泡定位提供参考 */
+
+		.layout-region {
+			display: flex;
+			align-items: center;
+			padding: 5px;
+			border-radius: 6px;
+			cursor: pointer;
+			-webkit-app-region: no-drag;
+			/* 确保可点击 */
+
+			&:hover {
+				background-color: rgba(255, 255, 255, 0.1);
+			}
+
+			img {
+				width: 20px;
+				height: 20px;
+				margin-right: 5px;
+			}
+
+			p {
+				font-size: 12px;
+				color: #c9d1d9;
+			}
+		}
+	}
+}
+
 .top-bar {
 	display: flex;
 	align-items: center;
@@ -475,56 +579,56 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 		}
 	}
 
-	.mid-bar {
-		display: flex;
-		flex-direction: row;
-		width: 100%;
+	// .mid-bar {
+	// 	display: flex;
+	// 	flex-direction: row;
+	// 	width: 100%;
 
-		.layout {
-			margin-left: auto;
-			display: flex;
-			align-items: center;
-			margin-right: 20px;
-			.layout-region:hover {
-				border-radius: 6px;
-				background-color: #c9d1d9;
-			}
-			.layout-region {
-				height: 40px;
-				-webkit-app-region: no-drag;
-				display: flex;
-				align-items: center;
-			}
-			img {
-				width: 30px;
-				height: 30px;
-			}
-		}
+	// 	.layout {
+	// 		margin-left: auto;
+	// 		display: flex;
+	// 		align-items: center;
+	// 		margin-right: 20px;
+	// 		.layout-region:hover {
+	// 			border-radius: 6px;
+	// 			background-color: #c9d1d9;
+	// 		}
+	// 		.layout-region {
+	// 			height: 40px;
+	// 			-webkit-app-region: no-drag;
+	// 			display: flex;
+	// 			align-items: center;
+	// 		}
+	// 		img {
+	// 			width: 30px;
+	// 			height: 30px;
+	// 		}
+	// 	}
 
-		.bubble {
-			display: flex;
-			width: 120px;
-			height: 80px;
-			background-color: white;
-			position: absolute;
-			top: 80px;
-			right: 80px;
-			padding: 20px;
-			z-index: 1;
-			color: #0f1114;
-			border-radius: 8px;
-			justify-content: space-between;
+	// 	.bubble {
+	// 		display: flex;
+	// 		width: 120px;
+	// 		height: 80px;
+	// 		background-color: white;
+	// 		position: absolute;
+	// 		top: 80px;
+	// 		right: 80px;
+	// 		padding: 20px;
+	// 		z-index: 1;
+	// 		color: #0f1114;
+	// 		border-radius: 8px;
+	// 		justify-content: space-between;
 
-			img {
-				width: 50px;
-				height: 50px;
-			}
+	// 		img {
+	// 			width: 50px;
+	// 			height: 50px;
+	// 		}
 
-			p {
-				margin-top: 0;
-			}
-		}
-	}
+	// 		p {
+	// 			margin-top: 0;
+	// 		}
+	// 	}
+	// }
 
 	.window-controls {
 		display: flex;
@@ -624,9 +728,16 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 20px;
 		height: 100%;
+
+		&.four {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		&.nine {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
 	}
 }
 
@@ -634,11 +745,20 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	position: relative;
 	background: #1a1f24;
 	border-radius: 10px;
-	min-height: 300px;
+	// min-height: 300px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	overflow: hidden;
+	aspect-ratio: 16/9;
+
+	.grid .four & {
+		min-height: 300px;
+	}
+
+	.grid .nine & {
+		min-height: 200px;
+	}
 
 	.avatar {
 		width: 80px;
