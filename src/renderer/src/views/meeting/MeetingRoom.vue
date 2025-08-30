@@ -6,24 +6,6 @@
 				<div class="title">会议 {{ meetingId || '—' }}</div>
 				<div class="sub">{{ nickName ? `您以「${nickName}」加入` : '您已加入会议' }}</div>
 			</div>
-			<div class="mid-bar">
-				<div class="layout">
-					<span class="layout-region">
-						<img src="../../assets/icons/layout.png"></img>
-						<p>布局</p>
-					</span>
-				</div>
-				<div v-if="isPop" class="bubble">
-					<div>
-						<img src="../../assets/icons/fourGrid.png"></img>
-						<p>四宫格</p>
-					</div>
-					<div>
-						<img src="../../assets/icons/nineGrid.png"></img>
-						<p>九宫格</p>
-					</div>
-				</div>
-			</div>
 			<div class="right window-controls">
 				<button class="control-btn min-btn" title="最小化" @click="controlWindow('minimize')">─</button>
 				<button class="control-btn max-btn" title="最大化/还原" @click="controlWindow('maximize')">⬜</button>
@@ -51,20 +33,15 @@
 		<div class="content">
 			<div class="video-area">
 				<div class="grid">
-					<div class="video-card" v-for="member in curMemberList">
-						<div class="avatar">{{ avatarInitial }}</div>
-						<div class="name-tag">{{ member?.nickName }}</div>
-					</div>
-
-					<!-- <div class="video-card self" :class="{ muted: isMuted || !micAvailable, cameraOff: !cameraOn }">
+					<div class="video-card self" :class="{ muted: isMuted || !micAvailable, cameraOff: !cameraOn }">
 						<div class="avatar" v-if="!cameraOn">{{ avatarInitial }}</div>
 						<video v-else autoplay muted playsinline></video>
 						<div class="name-tag">{{ nickName || '我' }}</div>
-					</div> -->
-					<!-- <div class="video-card placeholder" v-for="n in 3" :key="n">
+					</div>
+					<div class="video-card placeholder" v-for="n in 3" :key="n">
 						<div class="avatar">N{{ n }}</div>
 						<div class="name-tag">参会者 {{ n }}</div>
-					</div> -->
+					</div>
 				</div>
 			</div>
 		</div>
@@ -72,9 +49,9 @@
 		<!-- 底部控制栏 -->
 		<div class="bottom-bar">
 			<div class="controls">
-				<el-button :type="isMuted ? 'danger' : 'primary'" @click="toggleMute">{{ microOn ? '禁音' : '解除静音'
+				<el-button :type="isMuted ? 'danger' : 'primary'" @click="toggleMute">{{ isMuted ? '解除静音' : '禁音'
 				}}</el-button>
-				<el-button :type="cameraOn ? 'primary' : 'warning'" @click="toggleCamera">{{ cameraOn ? '停止视频' : '开启视频'
+				<el-button :type="cameraOn ? 'primary' : 'warning'" @click="toggleCamera">{{ cameraOn ? '关闭摄像头' : '摄像头'
 				}}</el-button>
 				<el-button @click="shareScreen">共享屏幕</el-button>
 				<el-button @click="invite">邀请</el-button>
@@ -97,16 +74,15 @@ import { useUserInfoStore } from '../../stores/UserInfoStore'
 const userStore = useUserInfoStore()
 const route = useRoute()
 const router = useRouter()
-const curMemberList = ref([])
+
 const meetingId = computed(() => route.params.meetingId)
 const nickName = computed(() => route.query.nickName || '')
 
 const isMuted = ref(false)
 const cameraOn = ref(route.query.video === '1')
-const microOn = ref(route.query.micro === '1')
 const localVideo = ref(null)
 const recording = ref(false)
-const isPop = ref(true)
+
 // 会议时长
 const startAt = Date.now()
 const durationText = ref('00:00:00')
@@ -122,76 +98,7 @@ const peerConnectionMap = new Map()
 const SIGNAL_TYPE_OFFER = 'offer'
 const SIGNAL_TYPE_ANSWER = 'answer'
 const SIGNAL_TYPE_CANDIDATE = 'candidate'
-const audioTrack = ref(null)
-const videoTrack = ref(null)
-// 管理本地媒体流
-const manageMediaTracks = async () => {
-	// 清理现有轨道
-	if (audioTrack.value) {
-		audioTrack.value.stop()
-		audioTrack.value = null
-	}
-	if (videoTrack.value) {
-		videoTrack.value.stop()
-		videoTrack.value = null
-	}
 
-	try {
-		// 根据当前状态获取新的媒体流
-		const constraints = {
-			audio: microOn.value,
-			video: cameraOn.value
-		}
-
-		if (microOn.value || cameraOn.value) {
-			const stream = await navigator.mediaDevices.getUserMedia(constraints)
-			localStream.value = stream
-
-			// 获取并存储轨道
-			audioTrack.value = stream.getAudioTracks()[0] || null
-			videoTrack.value = stream.getVideoTracks()[0] || null
-		} else {
-			localStream.value = null
-		}
-
-		// 更新所有peerConnection
-		updateAllPeerConnections()
-
-		// 更新本地视频显示
-		if (localVideo.value) {
-			localVideo.value.srcObject = localStream.value
-		}
-	} catch (err) {
-		console.error('访问媒体设备失败:', err)
-		ElMessage.error(`无法访问设备: ${err.message}`)
-
-		// 回滚状态
-		microOn.value = !microOn.value
-		cameraOn.value = !cameraOn.value
-	}
-}
-const updateAllPeerConnections = () => {
-	peerConnectionMap.forEach((peerConnection, userId) => {
-		updatePeerConnectionTracks(peerConnection)
-	})
-}
-
-const updatePeerConnectionTracks = (peerConnection) => {
-	// 移除现有的音视频轨道
-	peerConnection.getSenders().forEach(sender => {
-		if (sender.track && (sender.track.kind === 'audio' || sender.track.kind === 'video')) {
-			peerConnection.removeTrack(sender)
-		}
-	})
-
-	// 添加当前的音视频轨道
-	if (audioTrack.value) {
-		peerConnection.addTrack(audioTrack.value, localStream.value)
-	}
-	if (videoTrack.value) {
-		peerConnection.addTrack(videoTrack.value, localStream.value)
-	}
-}
 const createPeerConnection = (member, cameraEnable, micEnable, userId) => {
 	let peerConnection = peerConnectionMap.get(member.userId)
 	if (peerConnection) {
@@ -229,20 +136,12 @@ const createPeerConnection = (member, cameraEnable, micEnable, userId) => {
 		console.log('ontrack', event)
 		// 通过document.selectById获取dom然后通过.srcObject显示视频
 	}
-	// 替换原有的 oniceconnectionstatechange 监听器
-	peerConnection.onconnectionstatechange = () => {
-		console.log('Connection state:', peerConnection.connectionState);
-
+	peerConnection.oniceconnectionstatechange = (event) => {
+		console.log('oniceconnectionstatechange', event)
 		if (peerConnection.connectionState === 'connected') {
-			console.log("✅ P2P 连接已成功建立！");
-			// 这里可以执行连接成功后的操作
+			console.log("p2p 连接已建立！")
 		}
-
-		// 可选：处理其他状态（如失败/断开）
-		if (peerConnection.connectionState === 'failed') {
-			console.error("❌ P2P 连接失败");
-		}
-	};
+	}
 	// 当本地 ICE 代理的 “候选者收集状态” 发生变化时触发，用于监控候选者的收集进度
 	peerConnection.onicegatheringstatechange = (event) => {
 		peerConnectionMap.set(member.userId, peerConnection)
@@ -275,16 +174,12 @@ onMounted(async () => {
 	timer = setInterval(() => {
 		durationText.value = formatDuration(Date.now() - startAt)
 	}, 1000)
-	manageMediaTracks()
-
 	const state = await window.shared.get()
 	console.log('初始全局状态', state)
 	// const userInfo = userStore.getInfo()
 	const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {}
 	console.log("userInfo", userInfo)
 	const { memberList } = state
-	console.log("成员列表", memberList)
-	curMemberList.value = memberList
 	window.electronAPI.onWsMessage(async (message) => {
 		console.log('收到WebSocket消息:', message);
 		// 在这里处理消息，例如更新UI、触发业务逻辑等
@@ -303,6 +198,7 @@ onMounted(async () => {
 				const { messageContent } = msgJson
 				const peerType = messageContent?.signalType
 				const remotePeerConnection = peerConnectionMap.get(sendUserId)
+
 				if (!remotePeerConnection) {
 					console.warn('未找到对应的 PeerConnection:', sendUserId)
 					break
@@ -350,8 +246,7 @@ onMounted(async () => {
 
 					case SIGNAL_TYPE_CANDIDATE:
 						try {
-							console.log('ice candidate state', remotePeerConnection.iceConnectionState)
-							const candidateData = typeof messageContent.signalData === 'string' ? JSON.parse(messageContent.signalData) : messageContent.signalData
+							const candidateData = messageContent?.signalData
 							if (candidateData && candidateData.candidate) {
 								await remotePeerConnection.addIceCandidate(new RTCIceCandidate(candidateData))
 							}
@@ -375,7 +270,6 @@ onMounted(async () => {
 			try {
 				// 让加入会议的成员与会议中的其他成员建立对等连接
 				const peerConnection = createPeerConnection(member, 0, 0, userInfo?.userId)
-				updatePeerConnectionTracks(peerConnection)
 				// 发送offer请求
 				const offer = await peerConnection.createOffer()
 				await peerConnection.setLocalDescription(offer)
@@ -395,19 +289,7 @@ onMounted(async () => {
 	// 用户作为新加入的成员，需要与在会议中的所有成员建立peerConnection
 
 })
-onBeforeUnmount(() => {
-	if (timer) clearInterval(timer)
-
-	// 停止所有媒体轨道
-	if (localStream.value) {
-		localStream.value.getTracks().forEach(track => track.stop())
-	}
-
-	// 关闭所有 peerConnection
-	peerConnectionMap.forEach(peerConnection => {
-		peerConnection.close()
-	})
-})
+onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 
 // 网络状态（示意）
 const networkQuality = ref('good')
@@ -417,13 +299,11 @@ const micAvailable = true
 const avatarInitial = computed(() => (nickName.value || '我').slice(0, 1).toUpperCase())
 
 const toggleMute = () => {
-	microOn.value = !microOn.value
-	manageMediaTracks()
+	isMuted.value = !isMuted.value
 }
 
 const toggleCamera = () => {
 	cameraOn.value = !cameraOn.value
-	manageMediaTracks()
 }
 
 
@@ -472,57 +352,6 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 			font-size: 12px;
 			color: #c9d1d9;
 			opacity: .8;
-		}
-	}
-
-	.mid-bar {
-		display: flex;
-		flex-direction: row;
-		width: 100%;
-
-		.layout {
-			margin-left: auto;
-			display: flex;
-			align-items: center;
-			margin-right: 20px;
-			.layout-region:hover {
-				border-radius: 6px;
-				background-color: #c9d1d9;
-			}
-			.layout-region {
-				height: 40px;
-				-webkit-app-region: no-drag;
-				display: flex;
-				align-items: center;
-			}
-			img {
-				width: 30px;
-				height: 30px;
-			}
-		}
-
-		.bubble {
-			display: flex;
-			width: 120px;
-			height: 80px;
-			background-color: white;
-			position: absolute;
-			top: 80px;
-			right: 80px;
-			padding: 20px;
-			z-index: 1;
-			color: #0f1114;
-			border-radius: 8px;
-			justify-content: space-between;
-
-			img {
-				width: 50px;
-				height: 50px;
-			}
-
-			p {
-				margin-top: 0;
-			}
 		}
 	}
 
@@ -676,43 +505,5 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	padding: 10px 14px;
 	border-top: 1px solid rgba(255, 255, 255, 0.06);
 	background: rgba(255, 255, 255, 0.04);
-}
-
-// 布局选项样式
-.layout-options {
-	padding: 8px 0;
-
-	.layout-title {
-		font-size: 14px;
-		font-weight: 600;
-		color: #333;
-		margin-bottom: 12px;
-		text-align: center;
-	}
-
-	.layout-item {
-		display: flex;
-		align-items: center;
-		padding: 8px 12px;
-		cursor: pointer;
-		border-radius: 6px;
-		transition: background-color 0.2s;
-
-		&:hover {
-			background-color: #f5f7fa;
-		}
-
-		.layout-icon {
-			font-size: 18px;
-			margin-right: 8px;
-			width: 20px;
-			text-align: center;
-		}
-
-		.layout-name {
-			font-size: 13px;
-			color: #333;
-		}
-	}
 }
 </style>
