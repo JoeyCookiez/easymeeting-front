@@ -66,6 +66,13 @@
                     <el-switch v-model="joinForm.videoOpen" />
                 </div>
             </div>
+
+            <div class="meeting-settings">
+                <div class="setting-item">
+                    <span class="label">入会时开始麦克风</span>
+                    <el-switch v-model="joinForm.microOpen" />
+                </div>
+            </div>
         </div>
 
         <template #footer>
@@ -91,7 +98,8 @@ const joinForm = ref({
     meetingNo: '123456789',
     nickName: '',
     videoOpen: false,
-    password: ''
+    password: '',
+    microOpen: false
 })
 
 const handleFeatureClick = (item) => {
@@ -110,18 +118,19 @@ const closeJoinDialog = () => {
     showJoinDialog.value = false
 }
 
-const confirmJoinMeeting = async() => {
+const confirmJoinMeeting = async () => {
     // TODO: 接入实际加入会议逻辑
     showJoinDialog.value = false
     const preJoinRes = await preJoinMeeting(joinForm.value)
-    if(preJoinRes.code != 200){
+    if (preJoinRes.code != 200) {
         ElMessage.error(preJoinRes?.message)
         return
     }
     const joinRes = await joinMeeting({
-        videoOpen: joinForm.value?.videoOpen ? '1' : '0'
+        videoOpen: joinForm.value?.videoOpen ? '1' : '0',
+        microOpen: joinForm.value?.microOpen ? '1' : '0'
     })
-    if(joinRes.code != 200){
+    if (joinRes.code != 200) {
         ElMessage.error(joinRes?.message)
         return
     }
@@ -152,10 +161,11 @@ const confirmJoinMeeting = async() => {
     //         }
     //     })
     // }
-    await window.electron.ipcRenderer.invoke("openMeetingWindow",{
+    await window.electron.ipcRenderer.invoke("openMeetingWindow", {
         meetingId: joinForm.value.meetingNo,
         nickName: joinForm.value.nickName,
-        video: joinForm.value.videoOpen
+        video: joinForm.value.videoOpen,
+        micro: joinForm.value.microOpen
     })
 }
 
