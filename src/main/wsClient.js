@@ -3,7 +3,7 @@ import { getMainWindow, getWindow, getWindowMange } from "./windowProxy";
 import { updateSharedState } from "./sharedState";
 
 let ws = null
-const maxRetries = 5
+const maxRetries = 50
 let retryCount = 0
 const HEARTBASET_INTERVAL = 5000
 const retryInterval = 1000

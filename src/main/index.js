@@ -3,7 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { saveWindow,getMainWindow } from './windowProxy'
-import { onLoginOrRegister, onLoginSuccess, onSendPeerConnection, registerMeetingWindowHandlers } from './ipc'
+import { onLoginOrRegister, onLoginSuccess, onSendGeneralMessage, onSendPeerConnection, registerMeetingWindowHandlers } from './ipc'
 
 global.globalData = {
   memberList: []
@@ -51,6 +51,7 @@ onLoginOrRegister()
 onLoginSuccess()
 registerMeetingWindowHandlers()
 onSendPeerConnection()
+onSendGeneralMessage()
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.

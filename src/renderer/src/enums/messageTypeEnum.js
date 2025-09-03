@@ -1,0 +1,14 @@
+const  MessageTypeEnum={
+    ADD_MEETING_ROOM: 1,
+    PEER: 2,
+    EXIT_MEETING_ROOM: 3,
+    CHAT_TEXT_MESSAGE: 5,
+    USER_CONTACT_APPLY: 8,
+    INVITE_MEMBER_MEETING: 9,
+    FORCE_OFF_LINE: 10,
+    MEETING_USER_VIDEO_CHANGE: 11
+}
+
+export {
+    MessageTypeEnum
+}

@@ -14,3 +14,10 @@ export function joinMeeting(data){
         method:"post"
     })
 }
+
+export function exitMeeting(data){
+    return request({
+        url: "/meetingInfo/exitMeeting",
+        method: "post"
+    })
+}
