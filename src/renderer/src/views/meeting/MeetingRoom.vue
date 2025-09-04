@@ -138,7 +138,15 @@ const setVideoRef = (el,userId)=>{
 	if(el){
 		videoRefs.value[userId] = el
 	}else{
-		delete videoRefs.value[userId]
+		// 当元素被移除时，清理相关资源
+		if (videoRefs.value[userId]) {
+			const video = videoRefs.value[userId]
+			if (video && video.srcObject) {
+				video.srcObject.getTracks().forEach(track => track.stop())
+				video.srcObject = null
+			}
+			delete videoRefs.value[userId]
+		}
 	}
 }
 // 在 script 部分
@@ -147,8 +155,10 @@ const filteredMemberList = computed(() => {
 });
 const handleVideoLoaded = (event, userId) => {
 	const video = event.target
-	// video.play().catch(e => console.log(`${userId} 用户视频显示失败`, e))
-	playVideoWithRetry(video,userId)
+	// 检查视频元素是否仍然存在于DOM中
+	if (document.contains(video)) {
+		playVideoWithRetry(video, userId)
+	}
 }
 // 管理本地媒体流
 const manageMediaTracks = async () => {
@@ -297,8 +307,19 @@ peerConnection.ontrack = (event) => {
     return
   }
 
+  // 检查视频元素是否仍然存在于DOM中
+  if (!document.contains(videoElement)) {
+    console.warn(`视频元素已从DOM中移除: ${userId}`)
+    return
+  }
+
   // 检查是否已有流，避免重复添加
   if (videoElement.srcObject !== event.streams[0]) {
+    // 先停止之前的流
+    if (videoElement.srcObject) {
+      videoElement.srcObject.getTracks().forEach(track => track.stop())
+    }
+    
     videoElement.srcObject = event.streams[0]
     console.log(`✅ 为 ${member.nickName} 设置了视频源`)
     
@@ -333,17 +354,40 @@ peerConnection.ontrack = (event) => {
 	peerConnectionMap.set(member?.userId, peerConnection)
 	return peerConnection
 }
-const playVideoWithRetry = (videoElement, userId, attempt = 3) => {
+const playVideoWithRetry = (videoElement, userId, attempt = 1) => {
+  // 检查视频元素是否仍然存在于DOM中
+  if (!document.contains(videoElement)) {
+    console.warn(`视频元素已从DOM中移除，停止播放重试: ${userId}`)
+    return
+  }
+
   if (attempt > 5) {
     console.error(`⛔ 播放视频失败超过最大重试次数: ${userId}`)
     return
   }
   
+  // 检查视频元素是否准备好播放
+  if (videoElement.readyState < 2) { // HAVE_CURRENT_DATA
+    console.log(`视频元素未准备好播放，等待...: ${userId}`)
+    setTimeout(() => {
+      playVideoWithRetry(videoElement, userId, attempt)
+    }, 100)
+    return
+  }
+  
   videoElement.play().catch(e => {
-    console.log(`⛔ 播放视频失败: ${e.message}`)
+    console.log(`⛔ 播放视频失败 (尝试 ${attempt}/5): ${e.message}`)
+    
+    // 如果是DOM移除错误，停止重试
+    if (e.message.includes('removed from the document')) {
+      console.warn(`视频元素已从DOM中移除，停止重试: ${userId}`)
+      return
+    }
+    
+    // 其他错误继续重试
     setTimeout(() => {
       playVideoWithRetry(videoElement, userId, attempt + 1)
-    }, 500 * (attempt + 1)) // 指数退避重试
+    }, 500 * attempt) // 指数退避重试
   })
 }
 // 修改后的sendPeerMessage函数，接收一个包含所有参数的对象
@@ -565,19 +609,31 @@ onBeforeUnmount(() => {
 	// 停止所有媒体轨道
 	if (localStream.value) {
 		localStream.value.getTracks().forEach(track => track.stop())
+		localStream.value = null
 	}
 
 	// 关闭所有 peerConnection
 	peerConnectionMap.forEach(peerConnection => {
 		peerConnection.close()
 	})
-	  Object.values(videoRefs.value).forEach(video => {
-    if (video.srcObject) {
-      video.srcObject.getTracks().forEach(track => track.stop())
-      video.srcObject = null
-    }
-  })
-  videoRefs.value = {}
+	peerConnectionMap.clear()
+	
+	// 清理所有视频引用和流
+	Object.values(videoRefs.value).forEach(video => {
+		if (video && video.srcObject) {
+			video.srcObject.getTracks().forEach(track => track.stop())
+			video.srcObject = null
+		}
+	})
+	videoRefs.value = {}
+	
+	// 清理数据通道
+	Object.values(dataChannelMap).forEach(channel => {
+		if (channel && channel.readyState === 'open') {
+			channel.close()
+		}
+	})
+	dataChannelMap = {}
 })
 
 // 网络状态（示意）
@@ -618,7 +674,7 @@ watch(() => filteredMemberList.value, async () => {
   // 重新为所有需要视频的成员设置流
   peerConnectionMap.forEach((peerConnection, userId) => {
     const videoElement = videoRefs.value[userId]
-    if (videoElement && videoElement.srcObject) {
+    if (videoElement && videoElement.srcObject && document.contains(videoElement)) {
       playVideoWithRetry(videoElement, userId)
     }
   })
