@@ -2,6 +2,9 @@
     <div class="layout-container">
         <div class="sidebar">
             <div class="top-buttons">
+                <div class="nav-button">
+                    <el-avatar :size="50" :src="circleUrl" />
+                </div>
                 <div class="nav-button" :class="{ active: isActive('/meetingMain') }" @click="go('/meetingMain')">
                     <component :is="VideoCamera" class="nav-icon" />
                     <span class="nav-text">会议</span>
@@ -35,15 +38,23 @@
 import { VideoCamera, User, VideoPlay, Setting } from '@element-plus/icons-vue'
 import { useRouter, useRoute } from 'vue-router'
 import TitleBar from '@/components/TitleBar.vue'
-
+import { useUserInfoStore } from '../stores/UserInfoStore'
+import { onBeforeMount, ref } from 'vue'
+const userStore = useUserInfoStore()
 const router = useRouter()
 const route = useRoute()
-
+// const circleUrl = userStore.getInfo()?.avatar
+const circleUrl = ref("https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png")
 const go = (path) => {
     if (route.path !== path) {
         router.push(path)
     }
 }
+onBeforeMount(()=>{
+    const userInfo = JSON.parse(localStorage.getItem("userInfo"))
+    console.log('layout userInfo',userInfo)
+    circleUrl.value = userInfo?.avatar
+})
 const isActive = (path) => route.path === path
 </script>
 

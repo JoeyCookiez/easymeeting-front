@@ -179,6 +179,9 @@ const featureItems = ref([
 const now = ref(new Date())
 onMounted(() => {
     // 可在此处接入真实会议数据
+    const userInfo = JSON.parse(localStorage.getItem("userInfo"))
+    console.log("userInfo",userInfo)
+    joinForm.value.nickName = userInfo?.nickName
 })
 
 const month = computed(() => now.value.getMonth() + 1)
