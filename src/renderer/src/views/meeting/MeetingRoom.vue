@@ -61,7 +61,8 @@
 						</div>
 						<!-- <video v-else autoplay playsinline :id="`video-${member.userId}`"
 							@loadedmetadata="handleVideoLoaded($event, member.userId)"></video> -->
-						<video v-show="member?.openVideo" autoplay playsinline :ref="el => setVideoRef(el, member?.userId)"
+						<video v-show="member?.openVideo" autoplay playsinline
+							:ref="el => setVideoRef(el, member?.userId)"
 							@loadedmetadata="handleVideoLoaded($event, member?.userId)"></video>
 						<div class="name-tag">{{ member?.nickName }}</div>
 					</div>
@@ -137,6 +138,9 @@ const videoRefs = ref({})
 const setVideoRef = (el, userId) => {
 	if (el) {
 		videoRefs.value[userId] = el
+		el.oncanplay = () => {
+			el.play().catch(e => console.log("播放失败:", e))
+		}
 	} else {
 		// 当元素被移除时，清理相关资源
 		if (videoRefs.value[userId]) {
@@ -168,7 +172,7 @@ const manageMediaTracks = async () => {
 			localStream.value.getTracks().forEach(track => track.stop())
 			localStream.value = null
 		}
-		
+
 		// 只当至少一种设备启用时才获取新流
 		if (microOn.value || cameraOn.value) {
 			const constraints = {
@@ -178,7 +182,7 @@ const manageMediaTracks = async () => {
 
 			console.log(`🎥 获取媒体流，约束条件:`, constraints)
 			localStream.value = await navigator.mediaDevices.getUserMedia(constraints)
-			
+
 			// 如果本地dom节点存在则在本地显示
 			if (localVideo.value) {
 				localVideo.value.srcObject = localStream.value
@@ -209,9 +213,9 @@ const updatePeerConnectionTracks = async (peerConnection, userId) => {
 
 	// 2. 添加当前流的所有轨道
 	if (localStream.value) {
-		console.info("视频状态更新，为所有PeerConnection添加track",localStream.value)
-		localStream.value.getTracks().forEach(track=>{
-			peerConnection.addTrack(track,localStream.value)
+		console.info("视频状态更新，为所有PeerConnection添加track", localStream.value)
+		localStream.value.getTracks().forEach(track => {
+			peerConnection.addTrack(track, localStream.value)
 		})
 	}
 
@@ -266,7 +270,7 @@ const createPeerConnection = (member, cameraEnable, micEnable, userId) => {
 	console.warn(`为${member?.userId} 创建PeerConnection`)
 	// 如果存在视频音频流则为这个PeerConnection添加轨道
 	if (localStream.value) {
-		console.log("存在视频音频轨道",localStream.value)
+		console.log("存在视频音频轨道", localStream.value)
 		localStream.value.getTracks().forEach(track => {
 			peerConnection.addTrack(track, localStream.value)
 		})
@@ -291,7 +295,10 @@ const createPeerConnection = (member, cameraEnable, micEnable, userId) => {
 	}
 	peerConnection.ontrack = (event) => {
 		console.log('🚨 ontrack 事件触发', event)
-
+		if(event.streams.length === 0){
+			// 如果track为空则直接不处理
+			return
+		}
 		const userId = member.userId
 		const videoElement = videoRefs.value[userId]
 
@@ -305,6 +312,7 @@ const createPeerConnection = (member, cameraEnable, micEnable, userId) => {
 			console.warn(`视频元素已从DOM中移除: ${userId}`)
 			return
 		}
+		
 
 		// 检查是否已有流，避免重复添加
 		if (videoElement.srcObject !== event.streams[0]) {
@@ -312,26 +320,36 @@ const createPeerConnection = (member, cameraEnable, micEnable, userId) => {
 			if (videoElement.srcObject) {
 				videoElement.srcObject.getTracks().forEach(track => track.stop())
 			}
-
+			console.log("设置视频源之前检查 视频dom",videoElement,"视频流",event.streams)
 			videoElement.srcObject = event.streams[0]
 			console.log(`✅ 为 ${member.nickName} 设置了视频源`)
 
 			// 尝试播放视频
-			playVideoWithRetry(videoElement, userId)
+			// playVideoWithRetry(videoElement, userId)
+			setTimeout(() => {
+				videoElement.play().catch(e => {
+					console.error("视频播放失败", e)
+				})
+			}, 300)
 		}
 	}
 	// 替换原有的 oniceconnectionstatechange 监听器
-	peerConnection.onconnectionstatechange = () => {
+	peerConnection.onconnectionstatechange = async() => {
 		console.log('Connection state:', peerConnection.connectionState);
 
 		if (peerConnection.connectionState === 'connected') {
 			console.log("✅ P2P 连接已成功建立！");
 			// 这里可以执行连接成功后的操作
+			const videoEl = videoRefs.value[member.userId]
+			if(videoEl){
+				videoEl.play().catch(console.error)
+			}
 		}
 
 		// 可选：处理其他状态（如失败/断开）
 		if (peerConnection.connectionState === 'failed') {
 			console.error("❌ P2P 连接失败");
+			peerConnection.restartIce()
 		}
 	};
 	// 当本地 ICE 代理的 "候选者收集状态" 发生变化时触发，用于监控候选者的收集进度
@@ -412,10 +430,10 @@ const createGroupPeerConnection = async (memberList) => {
 			try {
 				// 让加入会议的成员与会议中的其他成员建立对等连接
 				const peerConnection = createPeerConnection(member, 0, 0, userInfo?.userId)
-				
+
 				// 确保本地媒体轨道已添加到新的peerConnection
 				updatePeerConnectionTracks(peerConnection, member?.userId)
-				
+
 				// 发送offer请求
 				const offer = await peerConnection.createOffer()
 				await peerConnection.setLocalDescription(offer)
@@ -451,7 +469,10 @@ const requestExistingUserStreams = async (newUserId) => {
 				updatePeerConnectionTracks(peerConnection, member.userId)
 
 				// 发送offer请求
-				const offer = await peerConnection.createOffer()
+				const offer = await peerConnection.createOffer({
+					offerToReceiveAudio: true,
+					offerToReceiveVideo: true
+				})
 				await peerConnection.setLocalDescription(offer)
 
 				sendPeerMessage({
@@ -510,15 +531,15 @@ onMounted(async () => {
 						updatePeerConnectionTracks(peerConnection, messageContent?.newMember?.userId)
 
 						// 发送offer请求
-						const offer = await peerConnection.createOffer()
-						await peerConnection.setLocalDescription(offer)
+						// const offer = await peerConnection.createOffer()
+						// await peerConnection.setLocalDescription(offer)
 
-						sendPeerMessage({
-							sendUserId: userInfo?.userId,
-							signalType: SIGNAL_TYPE_OFFER,
-							signalData: offer,
-							receiveUserId: messageContent?.newMember.userId,
-						})
+						// sendPeerMessage({
+						// 	sendUserId: userInfo?.userId,
+						// 	signalType: SIGNAL_TYPE_OFFER,
+						// 	signalData: offer,
+						// 	receiveUserId: messageContent?.newMember.userId,
+						// })
 
 						console.log(`✅ 已向新用户 ${messageContent?.newMember?.nickName} 发送offer`)
 					} catch (error) {
@@ -592,22 +613,6 @@ onMounted(async () => {
 					case SIGNAL_TYPE_CANDIDATE:
 						try {
 							console.log('ice candidate state', remotePeerConnection.iceConnectionState)
-							// 如果远端的candidate是close的状态则直接重新建立连接
-							// if (remotePeerConnection.iceConnectionState === 'closed') {
-							// 	const peerConnection = createPeerConnection(sendUserId, 0, 0, userInfo?.userId)
-							// 	// updatePeerConnectionTracks(peerConnection)
-							// 	// 发送offer请求
-							// 	const offer = await peerConnection.createOffer()
-							// 	await peerConnection.setLocalDescription(offer)
-
-							// 	sendPeerMessage({
-							// 		sendUserId: userInfo?.userId,
-							// 		signalType: SIGNAL_TYPE_OFFER,
-							// 		signalData: offer,
-							// 		receiveUserId: sendUserId,
-							// 	})
-							// 	break
-							// }
 							const candidateData = typeof messageContent.signalData === 'string' ? JSON.parse(messageContent.signalData) : messageContent.signalData
 							if (candidateData && candidateData.candidate) {
 								await remotePeerConnection.addIceCandidate(new RTCIceCandidate(candidateData))
@@ -690,7 +695,7 @@ const toggleMute = async () => {
 const toggleCamera = async () => {
 	cameraOn.value = !cameraOn.value
 	console.log(`🎥 摄像头状态切换为: ${cameraOn.value ? '开启' : '关闭'}`)
-	
+
 	const payload = {
 		type: MessageTypeEnum.MEETING_USER_VIDEO_CHANGE,
 		sendUserId: userInfo?.userId,
@@ -698,10 +703,10 @@ const toggleCamera = async () => {
 		openMicro: microOn.value
 	}
 	sendGeneralMessage(payload)
-	
+
 	// 先更新本地媒体流
 	await manageMediaTracks()
-	
+
 	// 然后更新所有PeerConnection并触发重新协商
 	console.log(`🔄 开始更新所有PeerConnection，当前连接数: ${peerConnectionMap.size}`)
 	await updateAllPeerConnections()
@@ -1072,6 +1077,15 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 		padding: 4px 8px;
 		border-radius: 6px;
 		font-size: 12px;
+	}
+	video{
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		background: #000;
 	}
 }
 
