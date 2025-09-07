@@ -207,7 +207,6 @@ const updatePeerConnectionTracks = async (peerConnection, userId) => {
 	peerConnection.getSenders().forEach(sender => {
 		if (sender.track) {
 			peerConnection.removeTrack(sender)
-			sender.track.stop()
 		}
 	})
 
@@ -277,10 +276,10 @@ const createPeerConnection = (member, cameraEnable, micEnable, userId) => {
 	}
 
 	if (!cameraEnable) {
-		peerConnection.addTransceiver('video', { direction: 'sendonly' })
+		peerConnection.addTransceiver('video', { direction: 'recvonly' })
 	}
 	if (!micEnable) {
-		peerConnection.addTransceiver('audio', { direction: 'sendonly' })
+		peerConnection.addTransceiver('audio', { direction: 'recvonly' })
 	}
 	peerConnection.onicecandidate = (event) => {
 		if (event.candidate) {
@@ -417,7 +416,6 @@ const sendGeneralMessage = (data) => {
 	window.electron.ipcRenderer.send('onSendGeneralMessage', data)
 }
 const toggleBubble = () => {
-	v
 	isPop.value = !isPop.value
 }
 const changeLayout = (type) => {
@@ -435,16 +433,16 @@ const createGroupPeerConnection = async (memberList) => {
 				updatePeerConnectionTracks(peerConnection, member?.userId)
 
 				// 发送offer请求
-				const offer = await peerConnection.createOffer()
-				await peerConnection.setLocalDescription(offer)
+				// const offer = await peerConnection.createOffer()
+				// await peerConnection.setLocalDescription(offer)
 
-				sendPeerMessage({
-					sendUserId: userInfo?.userId,
-					signalType: SIGNAL_TYPE_OFFER,
-					signalData: offer,
-					receiveUserId: member?.userId,
-				})
-				console.log(`✅ 已向新用户 ${member?.nickName} 发送offer`)
+				// sendPeerMessage({
+				// 	sendUserId: userInfo?.userId,
+				// 	signalType: SIGNAL_TYPE_OFFER,
+				// 	signalData: offer,
+				// 	receiveUserId: member?.userId,
+				// })
+				// console.log(`✅ 已向新用户 ${member?.nickName} 发送offer`)
 			} catch (error) {
 				console.error('为成员创建 offer 时出错:', error)
 			}
@@ -564,10 +562,11 @@ onMounted(async () => {
 				console.log("收到Peer消息", messageContent)
 				// const { messageContent } = msgJson
 				const peerType = messageContent?.signalType
-				const remotePeerConnection = peerConnectionMap.get(sendUserId)
+				let remotePeerConnection = peerConnectionMap.get(sendUserId)
 				if (!remotePeerConnection) {
 					console.warn('未找到对应的 PeerConnection:', sendUserId)
 					break
+					// remotePeerConnection = createPeerConnection({userId:sendUserId,nickName})
 				}
 
 				switch (peerType) {
@@ -599,7 +598,7 @@ onMounted(async () => {
 
 					case SIGNAL_TYPE_ANSWER:
 						try {
-							const answerData = typeof messageContent?.signalData ? JSON.parse(messageContent?.signalData) : messageContent?.signalData
+							const answerData = typeof messageContent?.signalData === 'string' ? JSON.parse(messageContent?.signalData) : messageContent?.signalData
 							if (!answerData || !answerData.type || !answerData.sdp) {
 								console.error('无效的 answer 数据:', answerData)
 								break
