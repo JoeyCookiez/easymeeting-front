@@ -4,7 +4,14 @@ import { electronAPI } from '@electron-toolkit/preload'
 // Custom APIs for renderer
 const api = {
   openMeetingWindow: (payload) => ipcRenderer.invoke('openMeetingWindow', payload),
-  meetingWindowControl: (action) => ipcRenderer.send('meeting-window-control', action)
+  meetingWindowControl: (action) => ipcRenderer.send('meeting-window-control', action),
+  createScreenShareTipbar: (payload) => ipcRenderer.invoke('createScreenShareTipbar', payload),
+  closeScreenShareTipbar: () => ipcRenderer.invoke('closeScreenShareTipbar'),
+  updateTipbarState: (state) => ipcRenderer.invoke('updateTipbarState', state),
+  getScreenSources: () => ipcRenderer.invoke('getScreenSources'),
+  setScreenShareSource: (sourceId) => ipcRenderer.invoke('setScreenShareSource', sourceId),
+  hideMeetingWindow: () => ipcRenderer.invoke('hideMeetingWindow'),
+  showMeetingWindow: () => ipcRenderer.invoke('showMeetingWindow')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, screen } from "electron"
+import { ipcMain, BrowserWindow, screen, session, desktopCapturer } from "electron"
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { getWindow, saveWindow, delWindow } from "./windowProxy"
@@ -92,13 +92,38 @@ export function registerMeetingWindowHandlers() {
             webPreferences: {
                 preload: join(__dirname, '../preload/index.js'),
                 sandbox: false,
-                scrollBounce: false
+                scrollBounce: false,
+                nodeIntegration: false,
+                contextIsolation: true,
+                enableRemoteModule: false,
+                webSecurity: true
             }
         })
 
         const idKey = `meeting-${meetingId || Date.now()}`
         saveWindow(idKey, meetingWindow)
         meetingWindow.on('closed', () => delWindow(idKey))
+
+        // 为会议窗口设置屏幕捕获权限
+        meetingWindow.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
+            desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
+                // 如果有选中的源，使用选中的源；否则使用第一个源
+                const selectedSource = global.selectedScreenShareSource 
+                    ? sources.find(source => source.id === global.selectedScreenShareSource)
+                    : sources[0]
+                
+                if (selectedSource) {
+                    console.log('使用选中的屏幕源:', selectedSource.name)
+                    callback({ video: selectedSource, audio: 'loopback' })
+                } else {
+                    console.log('使用默认屏幕源:', sources[0].name)
+                    callback({ video: sources[0], audio: 'loopback' })
+                }
+            }).catch((error) => {
+                console.error('获取屏幕源失败:', error)
+                callback({ video: sources[0], audio: 'loopback' })
+            })
+        }, { useSystemPicker: false })
 
         const hash = `/meetingRoom/${encodeURIComponent(meetingId || '')}?nickName=${encodeURIComponent(nickName || '')}&video=${video ? '1' : '0'}`
         if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -132,4 +157,174 @@ export function registerMeetingWindowHandlers() {
     ipcMain.handle('shared:get', () => getSharedState())
     ipcMain.handle('shared:set', (_e, next) => setSharedState(next))
     ipcMain.handle('shared:update', (_e, patch) => updateSharedState(patch))
+    
+    // 获取屏幕和窗口源
+    ipcMain.handle('getScreenSources', async () => {
+        try {
+            const sources = await desktopCapturer.getSources({ 
+                types: ['screen', 'window'],
+                thumbnailSize: { width: 200, height: 120 },
+                fetchWindowIcons: true
+            })
+            
+            console.log('获取到的原始源数量:', sources.length)
+            sources.forEach(source => {
+                console.log('源信息:', {
+                    id: source.id,
+                    name: source.name,
+                    type: source.id.startsWith('screen:') ? 'screen' : 'window'
+                })
+            })
+            
+            return sources.map(source => ({
+                id: source.id,
+                name: source.name,
+                type: source.id.startsWith('screen:') ? 'screen' : 'window',
+                thumbnail: source.thumbnail.toDataURL(),
+                appIcon: source.appIcon ? source.appIcon.toDataURL() : null
+            }))
+        } catch (error) {
+            console.error('获取屏幕源失败:', error)
+            return []
+        }
+    })
+    
+    // 设置屏幕共享源
+    ipcMain.handle('setScreenShareSource', async (event, sourceId) => {
+        try {
+            console.log('设置屏幕共享源:', sourceId)
+            // 这里我们存储选中的源ID，供setDisplayMediaRequestHandler使用
+            global.selectedScreenShareSource = sourceId
+            return { success: true }
+        } catch (error) {
+            console.error('设置屏幕共享源失败:', error)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // 创建屏幕共享tipbar窗口
+    ipcMain.handle('createScreenShareTipbar', async (event, payload) => {
+        try {
+            const { meetingId, nickName, isMuted, cameraOn, recording, sourceInfo } = payload || {}
+            
+            // 检查是否已经存在tipbar窗口
+            const existingTipbar = getWindow('screen-share-tipbar')
+            if (existingTipbar) {
+                existingTipbar.close()
+            }
+
+            const tipbarWindow = new BrowserWindow({
+                width: 1200,
+                height: 200,
+                minWidth: 800,
+                minHeight: 120,
+                show: false, // 先不显示，等加载完成后再显示
+                frame: false,
+                resizable: false,
+                alwaysOnTop: true, // 始终在顶部
+                skipTaskbar: true, // 不在任务栏显示
+                transparent: true, // 透明背景
+                webPreferences: {
+                    preload: join(__dirname, '../preload/index.js'),
+                    sandbox: false,
+                    nodeIntegration: false,
+                    contextIsolation: true,
+                    enableRemoteModule: false,
+                    webSecurity: true
+                }
+            })
+
+            // 设置窗口位置到屏幕顶部
+            const primaryDisplay = screen.getPrimaryDisplay()
+            const { width: screenWidth } = primaryDisplay.workAreaSize
+            const windowWidth = 1200
+            const x = Math.floor((screenWidth - windowWidth) / 2)
+            tipbarWindow.setPosition(x, 0)
+
+            const idKey = 'screen-share-tipbar'
+            saveWindow(idKey, tipbarWindow)
+            tipbarWindow.on('closed', () => delWindow(idKey))
+
+            const hash = `/screenShareTipbar/${encodeURIComponent(meetingId || '')}?nickName=${encodeURIComponent(nickName || '')}&isMuted=${isMuted ? '1' : '0'}&cameraOn=${cameraOn ? '1' : '0'}&recording=${recording ? '1' : '0'}&sourceType=${sourceInfo?.type || 'screen'}&sourceName=${encodeURIComponent(sourceInfo?.name || '')}`
+            
+            if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+                tipbarWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/#${hash}`)
+            } else {
+                const fileUrl = `file://${join(__dirname, '../renderer/index.html')}#${hash}`
+                tipbarWindow.loadURL(fileUrl)
+            }
+
+            // 窗口加载完成后显示
+            tipbarWindow.once('ready-to-show', () => {
+                tipbarWindow.show()
+                tipbarWindow.focus()
+            })
+
+            return { ok: true, windowId: tipbarWindow.id }
+        } catch (error) {
+            console.error('创建屏幕共享tipbar窗口失败:', error)
+            return { ok: false, error: error.message }
+        }
+    })
+
+    // 隐藏会议室窗口
+    ipcMain.handle('hideMeetingWindow', async (event) => {
+        try {
+            const meetingWindow = BrowserWindow.fromWebContents(event.sender)
+            if (meetingWindow) {
+                meetingWindow.hide()
+                return { success: true }
+            }
+            return { success: false, message: '会议室窗口不存在' }
+        } catch (error) {
+            console.error('隐藏会议室窗口失败:', error)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // 显示会议室窗口
+    ipcMain.handle('showMeetingWindow', async (event) => {
+        try {
+            const meetingWindow = BrowserWindow.fromWebContents(event.sender)
+            if (meetingWindow) {
+                meetingWindow.show()
+                meetingWindow.focus()
+                return { success: true }
+            }
+            return { success: false, message: '会议室窗口不存在' }
+        } catch (error) {
+            console.error('显示会议室窗口失败:', error)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // 关闭屏幕共享tipbar窗口
+    ipcMain.handle('closeScreenShareTipbar', async () => {
+        try {
+            const tipbarWindow = getWindow('screen-share-tipbar')
+            if (tipbarWindow) {
+                tipbarWindow.close()
+                return { success: true }
+            }
+            return { success: false, message: 'Tipbar窗口不存在' }
+        } catch (error) {
+            console.error('关闭屏幕共享tipbar窗口失败:', error)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // 更新tipbar状态
+    ipcMain.handle('updateTipbarState', async (event, state) => {
+        try {
+            const tipbarWindow = getWindow('screen-share-tipbar')
+            if (tipbarWindow) {
+                tipbarWindow.webContents.send('update-tipbar-state', state)
+                return { success: true }
+            }
+            return { success: false, message: 'Tipbar窗口不存在' }
+        } catch (error) {
+            console.error('更新tipbar状态失败:', error)
+            return { success: false, error: error.message }
+        }
+    })
 }

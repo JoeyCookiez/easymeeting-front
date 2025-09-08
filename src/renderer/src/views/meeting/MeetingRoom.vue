@@ -81,7 +81,7 @@
 				}}</el-button>
 				<el-button :type="cameraOn ? 'primary' : 'warning'" @click="toggleCamera">{{ cameraOn ? '停止视频' : '开启视频'
 				}}</el-button>
-				<el-button @click="shareScreen">共享屏幕</el-button>
+				<el-button @click="shareScreen">{{ sharing ? '停止共享':'共享屏幕' }}</el-button>
 				<el-button @click="invite">邀请</el-button>
 				<el-button @click="toggleMembers">成员</el-button>
 				<el-button @click="toggleChat">聊天</el-button>
@@ -91,6 +91,13 @@
 				<el-button type="danger" @click="endMeeting">结束会议</el-button>
 			</div>
 		</div>
+		
+		<!-- 屏幕共享选择弹窗 -->
+		<ScreenShareDialog 
+			:visible="showScreenShareDialog" 
+			@close="closeScreenShareDialog"
+			@share="startScreenShare"
+		/>
 	</div>
 </template>
 
@@ -101,6 +108,7 @@ import { ElMessage, ElNotification } from 'element-plus'
 import { useUserInfoStore } from '../../stores/UserInfoStore'
 import { exitMeeting } from '../../api/meeting'
 import { MessageTypeEnum } from '../../enums/messageTypeEnum'
+import ScreenShareDialog from '../../components/ScreenShareDialog.vue'
 const userStore = useUserInfoStore()
 const route = useRoute()
 const router = useRouter()
@@ -108,13 +116,14 @@ const curMemberList = ref([])
 const meetingId = computed(() => route.params.meetingId)
 const nickName = computed(() => route.query.nickName || '')
 const localStream = ref(null)
-const isMuted = ref(false)
+const isMuted = ref(route.query.micro !== '1')
 const cameraOn = ref(route.query.video === '1')
 const microOn = ref(route.query.micro === '1')
 const localVideo = ref(null)
 const recording = ref(false)
 const isPop = ref(false)
 const gridType = ref('four')
+const showScreenShareDialog = ref(false)
 const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {}
 // 会议时长
 const startAt = Date.now()
@@ -127,6 +136,7 @@ const formatDuration = (ms) => {
 	const s = String(sec % 60).padStart(2, '0')
 	return `${h}:${m}:${s}`
 }
+const sharing = ref(false)
 const peerConnectionMap = new Map()
 const dataChannelMap = new Map()
 const SIGNAL_TYPE_OFFER = 'offer'
@@ -503,6 +513,42 @@ onMounted(async () => {
 	console.log("成员列表", memberList)
 	curMemberList.value = memberList
 
+	// 监听tipbar的动作
+	window.electron.ipcRenderer.on('tipbar-action', async (event, data) => {
+		console.log('收到tipbar动作:', data)
+		switch (data.action) {
+			case 'stop-sharing':
+				await stopScreenShare()
+				break
+			case 'toggle-mute':
+				isMuted.value = data.isMuted
+				await manageMediaTracks()
+				await updateAllPeerConnections()
+				break
+			case 'toggle-camera':
+				cameraOn.value = data.cameraOn
+				await manageMediaTracks()
+				await updateAllPeerConnections()
+				break
+			case 'toggle-members':
+				toggleMembers()
+				break
+			case 'toggle-chat':
+				toggleChat()
+				break
+			case 'toggle-record':
+				recording.value = data.recording
+				toggleRecord()
+				break
+			case 'share-screen':
+				shareScreen()
+				break
+			case 'end-meeting':
+				endMeeting()
+				break
+		}
+	})
+
 	window.electronAPI.onWsMessage(async (message) => {
 		// console.log('收到WebSocket消息:', message);
 
@@ -676,6 +722,12 @@ onBeforeUnmount(() => {
 			channel.close()
 		}
 	})
+
+	// 清理tipbar监听器
+	window.electron.ipcRenderer.removeAllListeners('tipbar-action')
+	
+	// 关闭tipbar窗口
+	window.api.closeScreenShareTipbar()
 })
 
 // 网络状态（示意）
@@ -687,8 +739,16 @@ const avatarInitial = computed(() => (nickName.value || '我').slice(0, 1).toUpp
 
 const toggleMute = async () => {
 	microOn.value = !microOn.value
+	isMuted.value = !microOn.value
 	await manageMediaTracks()
-	updateAllPeerConnections()
+	await updateAllPeerConnections()
+	
+	// 更新tipbar状态
+	if (sharing.value) {
+		await window.api.updateTipbarState({
+			isMuted: isMuted.value
+		})
+	}
 }
 
 const toggleCamera = async () => {
@@ -709,6 +769,13 @@ const toggleCamera = async () => {
 	// 然后更新所有PeerConnection并触发重新协商
 	console.log(`🔄 开始更新所有PeerConnection，当前连接数: ${peerConnectionMap.size}`)
 	await updateAllPeerConnections()
+	
+	// 更新tipbar状态
+	if (sharing.value) {
+		await window.api.updateTipbarState({
+			cameraOn: cameraOn.value
+		})
+	}
 }
 
 
@@ -724,13 +791,132 @@ watch(() => filteredMemberList.value, async () => {
 	})
 }, { deep: true })
 const shareScreen = () => {
-	ElMessage.info('屏幕共享开发中')
+	if (sharing.value) {
+		// 停止屏幕共享
+		stopScreenShare()
+	} else {
+		// 开始屏幕共享选择
+		console.log("共享屏幕事件触发")
+		showScreenShareDialog.value = true
+	}
+}
+
+// 停止屏幕共享
+const stopScreenShare = async () => {
+	try {
+		// 停止屏幕共享流
+		if (localStream.value) {
+			localStream.value.getTracks().forEach(track => track.stop())
+			localStream.value = null
+		}
+		
+		// 关闭tipbar窗口
+		await window.api.closeScreenShareTipbar()
+		
+		// 重新显示会议室窗口
+		await window.api.showMeetingWindow()
+		
+		// 重置状态
+		sharing.value = false
+		cameraOn.value = false
+		
+		// 重新获取摄像头流（如果之前开启了摄像头）
+		await manageMediaTracks()
+		await updateAllPeerConnections()
+		
+		ElMessage.success('屏幕共享已停止')
+	} catch (error) {
+		console.error('停止屏幕共享失败:', error)
+		ElMessage.error('停止屏幕共享失败: ' + error.message)
+	}
+}
+
+// 关闭屏幕共享弹窗
+const closeScreenShareDialog = () => {
+	showScreenShareDialog.value = false
+}
+
+// 开始屏幕共享
+const startScreenShare = async (source) => {
+	try {
+		console.log('开始共享屏幕源:', source)
+		sharing.value = true
+		cameraOn.value = true
+		// 停止之前的本地流
+		if (localStream.value) {
+			localStream.value.getTracks().forEach(track => track.stop())
+		}
+		
+		// 通过主进程设置要共享的源
+		await window.electron.ipcRenderer.invoke('setScreenShareSource', source.id)
+		
+		// 使用选中的源获取屏幕流
+		const stream = await navigator.mediaDevices.getDisplayMedia({
+			audio: true,
+			video: {
+				width: { ideal: 1920 },
+				height: { ideal: 1080 },
+				frameRate: { ideal: 30 }
+			}
+		})
+		
+		// 设置新的屏幕共享流
+		localStream.value = stream
+		if (localVideo.value) {
+			localVideo.value.srcObject = stream
+			localVideo.value.onloadedmetadata = () => {
+				localVideo.value.play().catch(e => console.error('播放屏幕共享失败:', e))
+			}
+		}
+		
+		// 更新所有PeerConnection以发送屏幕共享流
+		await updateAllPeerConnections()
+		
+		// 创建tipbar窗口
+		await window.api.createScreenShareTipbar({
+			meetingId: meetingId.value,
+			nickName: nickName.value,
+			isMuted: isMuted.value,
+			cameraOn: cameraOn.value,
+			recording: recording.value,
+			sourceInfo: {
+				type: source.type,
+				name: source.name,
+				id: source.id
+			}
+		})
+		
+		// 如果共享的是窗口，隐藏会议室窗口
+		if (source.type === 'window') {
+			console.log('共享窗口，隐藏会议室窗口')
+			await window.api.hideMeetingWindow()
+		}
+		
+		// 关闭弹窗
+		showScreenShareDialog.value = false
+		
+		ElMessage.success(`正在共享: ${source.name}`)
+	} catch (error) {
+		console.error('屏幕共享失败:', error)
+		ElMessage.error('屏幕共享失败: ' + error.message)
+		showScreenShareDialog.value = false
+		sharing.value = false
+	}
 }
 
 const invite = () => { ElMessage.info('邀请功能开发中') }
 const toggleMembers = () => { ElMessage.info('成员列表开发中') }
 const toggleChat = () => { ElMessage.info('聊天面板开发中') }
-const toggleRecord = () => { recording.value = !recording.value }
+const toggleRecord = () => { 
+	recording.value = !recording.value
+	
+	// 更新tipbar状态
+	if (sharing.value) {
+		window.api.updateTipbarState({
+			recording: recording.value
+		})
+	}
+}
 const endMeeting = () => { window.api?.meetingWindowControl?.('close') }
 const controlWindow = async (action) => {
 	if (action === 'close') {

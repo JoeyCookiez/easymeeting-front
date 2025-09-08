@@ -51,6 +51,10 @@ const router = createRouter({
         path: "/meetingRoom/:meetingId?",
         name: "会议室",
         component: ()=>import('@/views/meeting/MeetingRoom.vue')
+    },{
+        path: "/screenShareTipbar/:meetingId?",
+        name: "屏幕共享提示栏",
+        component: ()=>import('@/views/meeting/ScreenShareTipbar.vue')
     }]
 })
 
