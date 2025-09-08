@@ -327,4 +327,19 @@ export function registerMeetingWindowHandlers() {
             return { success: false, error: error.message }
         }
     })
+
+    // 转发 tipbar 动作到会议窗口（用于在tipbar点击“结束共享”等时，控制会议窗口）
+    ipcMain.on('tipbar-action', (event, actionPayload) => {
+        try {
+            const senderWin = BrowserWindow.fromWebContents(event.sender)
+            // 广播到除发送者外的所有窗口（会议室窗口会监听该事件）
+            BrowserWindow.getAllWindows().forEach((win) => {
+                if (win && win !== senderWin && !win.isDestroyed()) {
+                    win.webContents.send('tipbar-action', actionPayload)
+                }
+            })
+        } catch (error) {
+            console.error('转发 tipbar-action 失败:', error)
+        }
+    })
 }
