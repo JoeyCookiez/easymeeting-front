@@ -81,11 +81,12 @@ export function registerMeetingWindowHandlers() {
     ipcMain.handle('openMeetingWindow', (e, payload) => {
         const { meetingId, nickName, video } = payload || {}
         const meetingWindow = new BrowserWindow({
-            width: 1278,
-            height: 845,
+            width: 1000,
+            height: 710,
+            useContentSize: true, // 设置内容区域尺寸
             minWidth: 1024,
             minHeight: 640,
-            show: true,
+            show: true, 
             autoHideMenuBar: true,
             frame: false,
             resizable: true,
