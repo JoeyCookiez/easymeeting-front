@@ -208,37 +208,72 @@ const manageMediaTracks = async () => {
 		ElMessage.error(`无法访问设备: ${err.message}`)
 	}
 }
-const updatePeerConnectionTracks = async (peerConnection, userId) => {
-	// 1. 移除所有现有轨道
-	peerConnection.getSenders().forEach(sender => {
-		if (sender.track) {
-			peerConnection.removeTrack(sender)
+const isMakingOfferMap = new Map()
+const politeRoleMap = new Map()
+
+const waitForStable = async (pc) => {
+	if (pc.signalingState === 'stable') return
+	await new Promise((resolve) => {
+		const handler = () => {
+			if (pc.signalingState === 'stable') {
+				pc.removeEventListener('signalingstatechange', handler)
+				resolve()
+			}
 		}
+		pc.addEventListener('signalingstatechange', handler)
 	})
+}
 
-	// 2. 添加当前流的所有轨道
-	if (localStream.value) {
-		console.info("视频状态更新，为所有PeerConnection添加track", localStream.value)
-		localStream.value.getTracks().forEach(track => {
-			peerConnection.addTrack(track, localStream.value)
-		})
-	}
+const ensurePoliteRole = (remoteUserId) => {
+	if (politeRoleMap.has(remoteUserId)) return politeRoleMap.get(remoteUserId)
+	const self = String(userInfo?.userId || '')
+	const remote = String(remoteUserId || '')
+	const polite = self > remote
+	politeRoleMap.set(remoteUserId, polite)
+	return polite
+}
 
-	// 3. 触发重新协商 - 这是关键步骤！
+const safeRenegotiate = async (peerConnection, remoteUserId) => {
+	const polite = ensurePoliteRole(remoteUserId)
+	if (isMakingOfferMap.get(remoteUserId)) return
+	isMakingOfferMap.set(remoteUserId, true)
 	try {
+		await waitForStable(peerConnection)
 		const offer = await peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
 		await peerConnection.setLocalDescription(offer)
-
 		sendPeerMessage({
 			sendUserId: userInfo?.userId,
 			signalType: SIGNAL_TYPE_OFFER,
 			signalData: offer,
-			receiveUserId: userId
+			receiveUserId: remoteUserId
 		})
-		console.log(`✅ 向用户 ${userId} 发送了重新协商OFFER`)
+		console.log(`✅ 向用户 ${remoteUserId} 发送了安全的重新协商OFFER（polite=${polite}）`)
 	} catch (error) {
-		console.error(`为 ${userId} 用户重新创建offer时出错:`, error)
+		console.error(`安全重新协商时出错（remote=${remoteUserId}）:`, error)
+	} finally {
+		isMakingOfferMap.set(remoteUserId, false)
 	}
+}
+
+const updatePeerConnectionTracks = async (peerConnection, userId) => {
+	const senders = peerConnection.getSenders()
+	if (localStream.value) {
+		const tracks = localStream.value.getTracks()
+		tracks.forEach(track => {
+			const sender = senders.find(s => s.track && s.track.kind === track.kind)
+			if (sender) {
+				sender.replaceTrack(track)
+			} else {
+				peerConnection.addTrack(track, localStream.value)
+			}
+		})
+	} else {
+		senders.forEach(sender => {
+			if (sender.track) sender.replaceTrack(null)
+		})
+	}
+
+	await safeRenegotiate(peerConnection, userId)
 }
 const updateAllPeerConnections = async () => {
 	const updatePromises = []
@@ -619,6 +654,21 @@ onMounted(async () => {
 							if (!offerData || !offerData.type || !offerData.sdp) {
 								console.error('无效的 offer 数据:', offerData)
 								break
+							}
+
+							// 处理 glare：如果本端也在发起或当前非 stable
+							const collision = isMakingOfferMap.get(sendUserId) || remotePeerConnection.signalingState !== 'stable'
+							const polite = ensurePoliteRole(sendUserId)
+							if (collision) {
+								if (!polite) {
+									console.warn('检测到协商冲突（glare），非礼貌端忽略此次 offer')
+									break
+								} else {
+									// 礼貌端回滚本地描述后再应用远端
+									if (remotePeerConnection.signalingState !== 'stable') {
+										await remotePeerConnection.setLocalDescription({ type: 'rollback' })
+									}
+								}
 							}
 
 							await remotePeerConnection.setRemoteDescription(new RTCSessionDescription(offerData))
