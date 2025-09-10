@@ -31,21 +31,6 @@
 			</div>
 		</div>
 
-		<!-- 会议信息悬浮显示 -->
-		<div class="meeting-info">
-			<div class="info-item">
-				<span class="label">会议号:</span>
-				<span class="value">{{ meetingId || '—' }}</span>
-			</div>
-			<div class="info-item">
-				<span class="label">时长:</span>
-				<span class="value">{{ durationText }}</span>
-			</div>
-			<div class="info-item">
-				<span class="label">网络:</span>
-				<span class="value" :class="networkQuality">{{ networkLabel }}</span>
-			</div>
-		</div>
 
 		<!-- 主体：视频网格 -->
 		<div class="content">
@@ -59,36 +44,46 @@
 					<div class="video-card" v-for="member in filteredMemberList">
 						<div class="avatar" v-if="!member?.openVideo">{{ member?.nickName?.slice(0, 1).toUpperCase() }}
 						</div>
-						<!-- <video v-else autoplay playsinline :id="`video-${member.userId}`"
-							@loadedmetadata="handleVideoLoaded($event, member.userId)"></video> -->
 						<video v-show="member?.openVideo" autoplay playsinline
 							:ref="el => setVideoRef(el, member?.userId)"
 							@loadedmetadata="handleVideoLoaded($event, member?.userId)"></video>
 						<div class="name-tag">{{ member?.nickName }}</div>
 					</div>
-					<!-- <div class="video-card placeholder" v-for="n in 3" :key="n">
-						<div class="avatar">N{{ n }}</div>
-						<div class="name-tag">参会者 {{ n }}</div>
-					</div> -->
+
 				</div>
 			</div>
 		</div>
 
 		<!-- 底部控制栏 -->
 		<div class="bottom-bar">
+			<div class="comments">
+				<div class="comment-input-area">
+					<img :src="face_line" width="20" height="20"/>
+					<input v-model="commentInput" class="comment-input"
+						placeholder="说点什么..." />
+				</div>
+			</div>
+
 			<div class="controls">
-				<el-button :type="isMuted ? 'danger' : 'primary'" @click="toggleMute">{{ microOn ? '禁音' : '解除静音'
-				}}</el-button>
-				<el-button :type="cameraOn ? 'primary' : 'warning'" @click="toggleCamera">{{ cameraOn ? '停止视频' : '开启视频'
-				}}</el-button>
-				<el-button @click="shareScreen">{{ sharing ? '停止共享' : '共享屏幕' }}</el-button>
-				<el-button @click="invite">邀请</el-button>
-				<el-button @click="toggleMembers">成员</el-button>
-				<el-button @click="toggleChat">聊天</el-button>
-				<el-button @click="toggleRecord">{{ recording ? '停止录制' : '录制' }}</el-button>
+				<IconWithTitle :svgSrc="microOn ? mic_on : mic_off" :title="microOn ? '禁音' : '解除禁音'" @click="toggleMute">
+				</IconWithTitle>
+				<IconWithTitle :svgSrc="cameraOn ? video_on : video_off" :title="cameraOn ? '停止视频' : '开启视频'"
+					@click="toggleCamera"></IconWithTitle>
+				<IconWithTitle :svgSrc="screen_share" title="共享屏幕" :iconSize="24" @click="shareScreen"></IconWithTitle>
+				<IconWithTitle :svgSrc="invite_on" title="邀请" :iconSize="24" @click="invite"></IconWithTitle>
+				<IconWithTitle :svgSrc="member_on" title="成员" :iconSize="24" @click="toggleMembers"></IconWithTitle>
+				<IconWithTitle :svgSrc="chat_on" title="聊天" @click="toggleChat"></IconWithTitle>
+				<IconWithTitle :svgSrc="recording ? record_on : record_off" :title="recording ? '停止录制' : '录制'"
+					@click="toggleRecord">
+
+				</IconWithTitle>
+				<!-- <el-button @click="toggleRecord">{{ recording ? '停止录制' : '录制' }}</el-button> -->
 			</div>
 			<div class="actions">
-				<el-button type="danger" @click="endMeeting">结束会议</el-button>
+
+				<IconWithTitle v-if="!isClickExit" @click="endMeeting" :svgSrc="exit_meeting_on"
+					:title="meetingInfo?.createUserId === userInfo?.userId ? '结束会议' : '离开会议'" />
+				<el-button v-else @click="() => isClickExit.value = false">取消</el-button>
 			</div>
 		</div>
 
@@ -105,9 +100,26 @@ import { useUserInfoStore } from '../../stores/UserInfoStore'
 import { exitMeeting } from '../../api/meeting'
 import { MessageTypeEnum } from '../../enums/messageTypeEnum'
 import ScreenShareDialog from '../../components/ScreenShareDialog.vue'
+import IconWithTitle from '../../components/IconWithTitle.vue'
+import mic_off from '../../assets/icons/mic_off.svg'
+import mic_on from '../../assets/icons/mic_on.svg'
+import video_off from '../../assets/icons/video_icon_off.svg'
+import video_on from '../../assets/icons/video_icon_on.svg'
+import screen_share from '../../assets/icons/screen_share.svg'
+import invite_on from '../../assets/icons/invite_normal.svg'
+import member_on from '../../assets/icons/member_normal.svg'
+import chat_on from '../../assets/icons/chat_normal.svg'
+import record_off from '../../assets/icons/record_off.svg'
+import record_on from '../../assets/icons/record_on.svg'
+import exit_meeting_on from '../../assets/icons/exit_meeting.svg'
+import face_line from '../../assets/icons/face_line.svg'
 const userStore = useUserInfoStore()
 const route = useRoute()
 const router = useRouter()
+const commentInput = ref('') // 弹幕输入框的内容
+const meetingInfo = ref({
+	createUserId: "277350997476"
+})
 const curMemberList = ref([])
 const meetingId = computed(() => route.params.meetingId)
 const nickName = computed(() => route.query.nickName || '')
@@ -138,8 +150,7 @@ const dataChannelMap = new Map()
 const SIGNAL_TYPE_OFFER = 'offer'
 const SIGNAL_TYPE_ANSWER = 'answer'
 const SIGNAL_TYPE_CANDIDATE = 'candidate'
-const audioTrack = ref(null)
-const videoTrack = ref(null)
+const isClickExit = ref(false) // 是否点击了离开会议的按钮，如果点击了就让按钮变成取消
 const videoRefs = ref({})
 const setVideoRef = (el, userId) => {
 	if (el) {
@@ -1000,6 +1011,7 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	height: 100%;
 	background: #0f1114;
 	color: #fff;
+	border-radius: 8px;
 }
 
 .bubble {
@@ -1099,9 +1111,11 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	align-items: center;
 	justify-content: space-between;
 	padding: 10px 14px;
-	background: rgba(255, 255, 255, 0.04);
+	// background: rgb(34, 115, 220);
+	background-color: #616ed0;
 	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 	-webkit-app-region: drag;
+	height: 30px;
 
 	.left {
 		width: 250px;
@@ -1118,57 +1132,6 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 			opacity: .8;
 		}
 	}
-
-	// .mid-bar {
-	// 	display: flex;
-	// 	flex-direction: row;
-	// 	width: 100%;
-
-	// 	.layout {
-	// 		margin-left: auto;
-	// 		display: flex;
-	// 		align-items: center;
-	// 		margin-right: 20px;
-	// 		.layout-region:hover {
-	// 			border-radius: 6px;
-	// 			background-color: #c9d1d9;
-	// 		}
-	// 		.layout-region {
-	// 			height: 40px;
-	// 			-webkit-app-region: no-drag;
-	// 			display: flex;
-	// 			align-items: center;
-	// 		}
-	// 		img {
-	// 			width: 30px;
-	// 			height: 30px;
-	// 		}
-	// 	}
-
-	// 	.bubble {
-	// 		display: flex;
-	// 		width: 120px;
-	// 		height: 80px;
-	// 		background-color: white;
-	// 		position: absolute;
-	// 		top: 80px;
-	// 		right: 80px;
-	// 		padding: 20px;
-	// 		z-index: 1;
-	// 		color: #0f1114;
-	// 		border-radius: 8px;
-	// 		justify-content: space-between;
-
-	// 		img {
-	// 			width: 50px;
-	// 			height: 50px;
-	// 		}
-
-	// 		p {
-	// 			margin-top: 0;
-	// 		}
-	// 	}
-	// }
 
 	.window-controls {
 		display: flex;
@@ -1257,6 +1220,7 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 .content {
 	flex: 1;
 	padding: 10px;
+	background-color: #dde5f4;
 	box-sizing: border-box;
 }
 
@@ -1283,7 +1247,7 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 
 .video-card {
 	position: relative;
-	background: #1a1f24;
+	background: #f1f7fe;
 	border-radius: 10px;
 	// min-height: 300px;
 	display: flex;
@@ -1337,15 +1301,39 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 
 
 .bottom-bar {
-	position: sticky;
-	bottom: 0;
 	display: flex;
-	align-items: center;
 	justify-content: space-between;
-	gap: 10px;
-	padding: 10px 14px;
-	border-top: 1px solid rgba(255, 255, 255, 0.06);
-	background: rgba(255, 255, 255, 0.04);
+	padding: 10px;
+	height: 60px;
+	background-color: #616ed0;
+	align-items: center;
+
+	.comment-input-area{
+		display: flex;
+		background-color: rgb(240,240,240);
+		align-items: center;
+		border-radius: 6px;
+		padding: 4px 8px;
+		max-width: 300px;
+		transition: background-color 0.2s ease;
+		.comment-input{
+			width: 120px;
+			height: 26px;
+			border: none;
+			outline: none;
+			box-shadow: none;
+			background-color: transparent;
+			caret-color: transparent; /* caret-color是光标的颜色 */
+			transition: width 0.2s ease,caret-color 0s;
+		}
+		&:focus-within{
+			background-color: rgb(229, 229, 229);
+			.comment-input{
+				// width: 180px;
+				caret-color: auto;
+			}
+		}
+	}
 }
 
 // 布局选项样式
