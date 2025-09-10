@@ -90,6 +90,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { joinMeeting, preJoinMeeting } from '../../api/meeting'
 import { ElMessage } from 'element-plus'
+import { setSharedState, updateSharedState } from '../../../../main/sharedState'
+import { saveMeetingInfo } from '../../utils/presist'
 
 const router = useRouter()
 
@@ -134,6 +136,7 @@ const confirmJoinMeeting = async () => {
         ElMessage.error(joinRes?.message)
         return
     }
+    saveMeetingInfo(joinRes?.data)
     // 打开会议室新窗口（不可用则回退到路由导航）
     // try {
     //     if (window.api?.openMeetingWindow) {
@@ -180,7 +183,7 @@ const now = ref(new Date())
 onMounted(() => {
     // 可在此处接入真实会议数据
     const userInfo = JSON.parse(localStorage.getItem("userInfo"))
-    console.log("userInfo",userInfo)
+    console.log("userInfo", userInfo)
     joinForm.value.nickName = userInfo?.nickName
 })
 

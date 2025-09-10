@@ -1,5 +1,5 @@
 <template>
-	<div class="meeting-room">
+	<div class="meeting-room" >
 		<!-- 顶部标题栏 -->
 		<div class="top-bar">
 			<div class="left">
@@ -123,6 +123,7 @@ import record_on from '../../assets/icons/record_on.svg'
 import exit_meeting_on from '../../assets/icons/exit_meeting.svg'
 import face_line from '../../assets/icons/face_line.svg'
 import layout_fill from '../../assets/icons/layout_on.svg'
+import { getMeetingInfo } from '../../utils/presist'
 const userStore = useUserInfoStore()
 const route = useRoute()
 const router = useRouter()
@@ -584,9 +585,9 @@ onMounted(async () => {
 	const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {}
 	// console.log("userInfo", userInfo)
 	const { memberList } = state
-	// console.log("成员列表", memberList)
+	console.log("state", state)
 	curMemberList.value = memberList
-
+	meetingInfo.value = getMeetingInfo()
 	// 监听tipbar的动作
 	window.electron.ipcRenderer.on('tipbar-action', async (event, data) => {
 		console.log('收到tipbar动作:', data)
@@ -766,9 +767,9 @@ onMounted(async () => {
 				break
 			case MessageTypeEnum.MEETING_USER_VIDEO_CHANGE:
 				// 用户的摄像头、语音修改
-				console.log("MEETING_USER_VIDEO_CHANGE JSON", messageContent)
+				// console.log("MEETING_USER_VIDEO_CHANGE JSON", messageContent)
 				const stateChangeJson = typeof messageContent === 'string' ? JSON.parse(messageContent) : messageContent
-				console.log(filteredMemberList.value)
+				// console.log(filteredMemberList.value)
 				const changeUserItem = filteredMemberList.value.find(item => item.userId === stateChangeJson?.sendUserId)
 				changeUserItem.openVideo = stateChangeJson?.openVideo
 				changeUserItem.openMicro = stateChangeJson?.openMicro
@@ -1035,6 +1036,10 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 </script>
 
 <style lang="scss" scoped>
+body{
+	border-radius: 8px;
+	overflow: hidden;
+}
 .meeting-room {
 	position: relative;
 	display: flex;
@@ -1420,6 +1425,7 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	height: 56px;
 	font-size: 14px;
 	color: #000;
+	cursor: pointer;
 }
 
 .bottom-exit-bubble {

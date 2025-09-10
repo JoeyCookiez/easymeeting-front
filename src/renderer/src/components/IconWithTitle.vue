@@ -44,6 +44,7 @@ const fontSizeCss = computed(() => toCssSize(props.fontSize))
   padding: 8px 10px;             /* 给悬停背景一些内边距 */
   border-radius: 6px;            /* 6px 圆角 */
   transition: background-color 0.2s ease;
+  cursor: pointer;
 }
 
 .icon-with-title:hover {
