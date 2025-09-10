@@ -9,7 +9,7 @@
 			<div class="mid-bar">
 				<div class="layout">
 					<span class="layout-region" @click="toggleBubble">
-						<img src="../../assets/icons/layout.png"></img>
+						<img :src="layout_fill" style="width: 22px; height: 22px;"></img>
 						<p>布局</p>
 					</span>
 				</div>
@@ -27,7 +27,11 @@
 			<div class="right window-controls">
 				<button class="control-btn min-btn" title="最小化" @click="controlWindow('minimize')">─</button>
 				<button class="control-btn max-btn" title="最大化/还原" @click="controlWindow('maximize')">⬜</button>
-				<button class="control-btn close-btn" title="关闭" @click="controlWindow('close')">×</button>
+				<button class="control-btn close-btn" title="关闭" @click="toggleExitBubble(0)">×</button>
+			</div>
+			<div v-if="isExitTop" class="top-exit-bubble">
+				<el-button type="danger" v-if="meetingInfo?.createUserId === userInfo?.userId" @click="handleFinishMeeting">结束会议</el-button>
+				<el-button @click="controlWindow('close')">离开会议</el-button>
 			</div>
 		</div>
 
@@ -58,14 +62,14 @@
 		<div class="bottom-bar">
 			<div class="comments">
 				<div class="comment-input-area">
-					<img :src="face_line" width="20" height="20"/>
-					<input v-model="commentInput" class="comment-input"
-						placeholder="说点什么..." />
+					<img :src="face_line" width="20" height="20" />
+					<input v-model="commentInput" class="comment-input" placeholder="说点什么..." />
 				</div>
 			</div>
 
 			<div class="controls">
-				<IconWithTitle :svgSrc="microOn ? mic_on : mic_off" :title="microOn ? '禁音' : '解除禁音'" @click="toggleMute">
+				<IconWithTitle :svgSrc="microOn ? mic_on : mic_off" :title="microOn ? '禁音' : '解除禁音'"
+					@click="toggleMute">
 				</IconWithTitle>
 				<IconWithTitle :svgSrc="cameraOn ? video_on : video_off" :title="cameraOn ? '停止视频' : '开启视频'"
 					@click="toggleCamera"></IconWithTitle>
@@ -81,9 +85,14 @@
 			</div>
 			<div class="actions">
 
-				<IconWithTitle v-if="!isClickExit" @click="endMeeting" :svgSrc="exit_meeting_on"
+				<IconWithTitle v-if="!isClickExit" @click="toggleExitBubble(1)" :svgSrc="exit_meeting_on"
 					:title="meetingInfo?.createUserId === userInfo?.userId ? '结束会议' : '离开会议'" />
-				<el-button v-else @click="() => isClickExit.value = false">取消</el-button>
+				<!-- <el-button v-else @click="cancelExit">取消</el-button> -->
+				<div v-else class="cancel-area" @click="cancelExit">取消</div>
+				<div v-if="isExitBottom" class="bottom-exit-bubble">
+					<el-button type="danger" v-if="meetingInfo?.createUserId === userInfo?.userId" @click="handleFinishMeeting">结束会议</el-button>
+					<el-button @click="controlWindow('close')">离开会议</el-button>
+				</div>
 			</div>
 		</div>
 
@@ -113,6 +122,7 @@ import record_off from '../../assets/icons/record_off.svg'
 import record_on from '../../assets/icons/record_on.svg'
 import exit_meeting_on from '../../assets/icons/exit_meeting.svg'
 import face_line from '../../assets/icons/face_line.svg'
+import layout_fill from '../../assets/icons/layout_on.svg'
 const userStore = useUserInfoStore()
 const route = useRoute()
 const router = useRouter()
@@ -170,6 +180,8 @@ const setVideoRef = (el, userId) => {
 		}
 	}
 }
+const isExitTop = ref(false) // 是否是上方弹窗
+const isExitBottom = ref(false) // 是否是下方弹窗
 // 在 script 部分
 const filteredMemberList = computed(() => {
 	return curMemberList.value.length > 1 ? curMemberList.value.filter(member => member.userId !== userInfo?.userId) : [];
@@ -180,6 +192,10 @@ const handleVideoLoaded = (event, userId) => {
 	if (document.contains(video)) {
 		playVideoWithRetry(video, userId)
 	}
+}
+// 结束会议逻辑
+const handleFinishMeeting = ()=>{
+	
 }
 // 管理本地媒体流
 const manageMediaTracks = async () => {
@@ -469,6 +485,22 @@ const sendGeneralMessage = (data) => {
 }
 const toggleBubble = () => {
 	isPop.value = !isPop.value
+}
+// 控制上下方退出会议弹窗的函数
+// param : pos : 0 , 1
+// 0 表示是top 1 表示是 bottom
+const toggleExitBubble = (pos) => {
+	if (pos) {
+		// 1的情况，下方弹窗
+		isExitBottom.value = true
+		isClickExit.value = true
+	} else {
+		isExitTop.value = true
+	}
+}
+const cancelExit = () => {
+	isClickExit.value = false
+	isExitBottom.value = false
 }
 const changeLayout = (type) => {
 	gridType.value = type
@@ -1308,27 +1340,31 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	background-color: #616ed0;
 	align-items: center;
 
-	.comment-input-area{
+	.comment-input-area {
 		display: flex;
-		background-color: rgb(240,240,240);
+		background-color: rgb(240, 240, 240);
 		align-items: center;
 		border-radius: 6px;
 		padding: 4px 8px;
 		max-width: 300px;
 		transition: background-color 0.2s ease;
-		.comment-input{
+
+		.comment-input {
 			width: 120px;
 			height: 26px;
 			border: none;
 			outline: none;
 			box-shadow: none;
 			background-color: transparent;
-			caret-color: transparent; /* caret-color是光标的颜色 */
-			transition: width 0.2s ease,caret-color 0s;
+			caret-color: transparent;
+			/* caret-color是光标的颜色 */
+			transition: width 0.2s ease, caret-color 0s;
 		}
-		&:focus-within{
+
+		&:focus-within {
 			background-color: rgb(229, 229, 229);
-			.comment-input{
+
+			.comment-input {
 				// width: 180px;
 				caret-color: auto;
 			}
@@ -1371,6 +1407,59 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 			font-size: 13px;
 			color: #333;
 		}
+	}
+}
+
+.cancel-area {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: rgb(229, 229, 229);
+	border-radius: 6px;
+	width: 60px;
+	height: 56px;
+	font-size: 14px;
+	color: #000;
+}
+
+.bottom-exit-bubble {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 8px 0px;
+	flex-direction: column;
+	position: absolute;
+	bottom: 72px;
+	width: 100px;
+	right: 5px;
+	background-color: #fff;
+	border-radius: 6px;
+
+	button {
+		margin-left: 0;
+		margin-top: 5px;
+		margin-bottom: 5px;
+	}
+}
+
+.top-exit-bubble {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 8px 0px;
+	flex-direction: column;
+	position: absolute;
+	// bottom: 72px;
+	top: 60px;
+	width: 100px;
+	right: 5px;
+	background-color: #fff;
+	border-radius: 6px;
+
+	button {
+		margin-left: 0;
+		margin-top: 5px;
+		margin-bottom: 5px;
 	}
 }
 </style>
