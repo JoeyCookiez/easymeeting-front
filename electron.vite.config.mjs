@@ -21,6 +21,8 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()]
   },
   renderer: {
+    // 让 Vite 将 .apng 当作静态资源处理
+    assetsInclude: ["**/*.apng"],
     resolve: {
       alias: {
         '@': resolve('src/renderer/src')

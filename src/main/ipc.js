@@ -28,6 +28,44 @@ const onLoginOrRegister = () => {
         mainWindow.setResizable(false)
     })
 }
+const onShowJoinMeetingWindow = () => {
+    ipcMain.handle("onShowJoinMeetingWindow", (e, payload) => {
+        const {nickName} = payload
+        const joinMeetingWindow = new BrowserWindow({
+            width: 370,
+            height: 500,
+            useContentSize: true, // 设置内容区域尺寸
+            show: true,
+            autoHideMenuBar: true,
+            frame: false,
+            resizable: true,
+            transparent: true,
+            webPreferences: {
+                preload: join(__dirname, '../preload/index.js'),
+                sandbox: false,
+                scrollBounce: false,
+                nodeIntegration: false,
+                contextIsolation: true,
+                enableRemoteModule: false,
+                webSecurity: true
+            }
+        })
+        // 注册窗口
+        saveWindow("joinMeeting", joinMeetingWindow)
+        joinMeetingWindow.on("close", () => { delWindow("joinMeeting") })
+        // 窗口自动居中
+        joinMeetingWindow.center()
+        // 窗口加载路由页面
+        const hash = `/joinMeeting/?nickName=${encodeURIComponent(nickName || '')}`
+        if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+            joinMeetingWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/#${hash}`)
+        } else {
+            const fileUrl = `file://${join(__dirname, '../renderer/index.html')}#${hash}`
+            joinMeetingWindow.loadURL(fileUrl)
+        }
+    })
+}
+
 const onLoginSuccess = () => {
     ipcMain.handle("onLoginSuccess", (e, userInfo, wsUrl) => {
         const mainWindow = getWindow("main");
@@ -72,7 +110,8 @@ export {
     onLoginOrRegister,
     onLoginSuccess,
     onSendPeerConnection,
-    onSendGeneralMessage
+    onSendGeneralMessage,
+    onShowJoinMeetingWindow
 }
 
 // 会议室窗口：注册打开与控制事件
@@ -86,10 +125,11 @@ export function registerMeetingWindowHandlers() {
             useContentSize: true, // 设置内容区域尺寸
             minWidth: 1024,
             minHeight: 640,
-            show: true, 
+            show: true,
             autoHideMenuBar: true,
             frame: false,
             resizable: true,
+            transparent: true,
             webPreferences: {
                 preload: join(__dirname, '../preload/index.js'),
                 sandbox: false,
@@ -109,10 +149,10 @@ export function registerMeetingWindowHandlers() {
         meetingWindow.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
             desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
                 // 如果有选中的源，使用选中的源；否则使用第一个源
-                const selectedSource = global.selectedScreenShareSource 
+                const selectedSource = global.selectedScreenShareSource
                     ? sources.find(source => source.id === global.selectedScreenShareSource)
                     : sources[0]
-                
+
                 if (selectedSource) {
                     console.log('使用选中的屏幕源:', selectedSource.name)
                     callback({ video: selectedSource, audio: 'loopback' })
@@ -158,16 +198,16 @@ export function registerMeetingWindowHandlers() {
     ipcMain.handle('shared:get', () => getSharedState())
     ipcMain.handle('shared:set', (_e, next) => setSharedState(next))
     ipcMain.handle('shared:update', (_e, patch) => updateSharedState(patch))
-    
+
     // 获取屏幕和窗口源
     ipcMain.handle('getScreenSources', async () => {
         try {
-            const sources = await desktopCapturer.getSources({ 
+            const sources = await desktopCapturer.getSources({
                 types: ['screen', 'window'],
                 thumbnailSize: { width: 200, height: 120 },
                 fetchWindowIcons: true
             })
-            
+
             console.log('获取到的原始源数量:', sources.length)
             sources.forEach(source => {
                 console.log('源信息:', {
@@ -176,7 +216,7 @@ export function registerMeetingWindowHandlers() {
                     type: source.id.startsWith('screen:') ? 'screen' : 'window'
                 })
             })
-            
+
             return sources.map(source => ({
                 id: source.id,
                 name: source.name,
@@ -189,7 +229,7 @@ export function registerMeetingWindowHandlers() {
             return []
         }
     })
-    
+
     // 设置屏幕共享源
     ipcMain.handle('setScreenShareSource', async (event, sourceId) => {
         try {
@@ -207,7 +247,7 @@ export function registerMeetingWindowHandlers() {
     ipcMain.handle('createScreenShareTipbar', async (event, payload) => {
         try {
             const { meetingId, nickName, isMuted, cameraOn, recording, sourceInfo } = payload || {}
-            
+
             // 检查是否已经存在tipbar窗口
             const existingTipbar = getWindow('screen-share-tipbar')
             if (existingTipbar) {
@@ -247,7 +287,7 @@ export function registerMeetingWindowHandlers() {
             tipbarWindow.on('closed', () => delWindow(idKey))
 
             const hash = `/screenShareTipbar/${encodeURIComponent(meetingId || '')}?nickName=${encodeURIComponent(nickName || '')}&isMuted=${isMuted ? '1' : '0'}&cameraOn=${cameraOn ? '1' : '0'}&recording=${recording ? '1' : '0'}&sourceType=${sourceInfo?.type || 'screen'}&sourceName=${encodeURIComponent(sourceInfo?.name || '')}`
-            
+
             if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
                 tipbarWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/#${hash}`)
             } else {

@@ -1,5 +1,5 @@
 <template>
-	<div class="meeting-room" >
+	<div class="meeting-room">
 		<!-- 顶部标题栏 -->
 		<div class="top-bar">
 			<div class="left">
@@ -30,14 +30,15 @@
 				<button class="control-btn close-btn" title="关闭" @click="toggleExitBubble(0)">×</button>
 			</div>
 			<div v-if="isExitTop" class="top-exit-bubble">
-				<el-button type="danger" v-if="meetingInfo?.createUserId === userInfo?.userId" @click="handleFinishMeeting">结束会议</el-button>
+				<el-button type="danger" v-if="meetingInfo?.createUserId === userInfo?.userId"
+					@click="handleFinishMeeting">结束会议</el-button>
 				<el-button @click="controlWindow('close')">离开会议</el-button>
 			</div>
 		</div>
 
 
 		<!-- 主体：视频网格 -->
-		<div class="content">
+		<div class="content" @click="cancelExit">
 			<div class="video-area">
 				<div class="grid" :class="gridType">
 					<div class="video-card self" :class="{ muted: isMuted || !micAvailable, cameraOff: !cameraOn }">
@@ -90,7 +91,8 @@
 				<!-- <el-button v-else @click="cancelExit">取消</el-button> -->
 				<div v-else class="cancel-area" @click="cancelExit">取消</div>
 				<div v-if="isExitBottom" class="bottom-exit-bubble">
-					<el-button type="danger" v-if="meetingInfo?.createUserId === userInfo?.userId" @click="handleFinishMeeting">结束会议</el-button>
+					<el-button type="danger" v-if="meetingInfo?.createUserId === userInfo?.userId"
+						@click="handleFinishMeeting">结束会议</el-button>
 					<el-button @click="controlWindow('close')">离开会议</el-button>
 				</div>
 			</div>
@@ -195,8 +197,8 @@ const handleVideoLoaded = (event, userId) => {
 	}
 }
 // 结束会议逻辑
-const handleFinishMeeting = ()=>{
-	
+const handleFinishMeeting = () => {
+
 }
 // 管理本地媒体流
 const manageMediaTracks = async () => {
@@ -502,6 +504,7 @@ const toggleExitBubble = (pos) => {
 const cancelExit = () => {
 	isClickExit.value = false
 	isExitBottom.value = false
+	isExitTop.value = false
 }
 const changeLayout = (type) => {
 	gridType.value = type
@@ -1036,10 +1039,6 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 </script>
 
 <style lang="scss" scoped>
-body{
-	border-radius: 8px;
-	overflow: hidden;
-}
 .meeting-room {
 	position: relative;
 	display: flex;
@@ -1153,7 +1152,8 @@ body{
 	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 	-webkit-app-region: drag;
 	height: 30px;
-
+	border-top-left-radius: 8px;
+	border-top-right-radius: 8px;
 	.left {
 		width: 250px;
 
@@ -1344,7 +1344,8 @@ body{
 	height: 60px;
 	background-color: #616ed0;
 	align-items: center;
-
+	border-bottom-left-radius: 8px;
+	border-bottom-right-radius: 8px;
 	.comment-input-area {
 		display: flex;
 		background-color: rgb(240, 240, 240);

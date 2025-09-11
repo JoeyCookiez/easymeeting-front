@@ -16,10 +16,20 @@ const saveUserInfo = (data)=>{
     return     
 }
 
+const getUserStatus = ()=>{
+    return JSON.parse(localStorage.getItem("userStatus")) || {}
+}
+
+const saveUserStatus = (data)=>{
+    localStorage.setItem("userStatus",JSON.stringify(data))
+    return
+}
 
 export {
     getMeetingInfo,
     saveMeetingInfo,
     getUserInfo,
-    saveUserInfo
+    saveUserInfo,
+    getUserStatus,
+    saveUserStatus
 }

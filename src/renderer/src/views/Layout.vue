@@ -3,7 +3,7 @@
         <div class="sidebar">
             <div class="top-buttons">
                 <div class="nav-button">
-                    <el-avatar :size="50" :src="circleUrl" />
+                    <el-avatar :size="42" :src="circleUrl" />
                 </div>
                 <div class="nav-button" :class="{ active: isActive('/meetingMain') }" @click="go('/meetingMain')">
                     <component :is="VideoCamera" class="nav-icon" />

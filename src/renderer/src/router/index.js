@@ -1,60 +1,62 @@
-import {createRouter,createWebHashHistory} from "vue-router"
+import { createRouter, createWebHashHistory } from "vue-router"
 const router = createRouter({
-    mode:"hash",
-    history:createWebHashHistory(import.meta.env.BASE_URL),
-    routes:[{
+    mode: "hash",
+    history: createWebHashHistory(import.meta.env.BASE_URL),
+    routes: [{
         path: "/",
         name: "登录",
-        component:()=> import ('@/views/login/Login.vue')
-    },{
+        component: () => import('@/views/login/Login.vue')
+    },
+    {
+        path: "/joinMeeting",
+        name: "加入会议",
+        component: () => import('@/views/meeting/JoinMeeting.vue')
+    },
+    {
         path: "/home",
         name: "主页",
-        component:()=> import ('@/views/Layout.vue'),
+        component: () => import('@/views/Layout.vue'),
         redirect: "/meetingMain",
-        children:[{
+        children: [{
             path: "/meetingMain",
             name: "首页",
-            component: ()=>import('@/views/meeting/MeetingMain.vue'),
+            component: () => import('@/views/meeting/MeetingMain.vue'),
             meta: {
                 code: "meeting"
             }
-        },{
+        }, {
             path: "/contacts",
             name: "通讯录",
-            component: ()=>import('@/views/other/Contacts.vue')
-        },{
+            component: () => import('@/views/other/Contacts.vue')
+        }, {
             path: "/recordings",
             name: "录制",
-            component: ()=>import('@/views/other/Recordings.vue')
-        },{
+            component: () => import('@/views/other/Recordings.vue')
+        }, {
             path: "/settings",
             name: "设置",
-            component: ()=>import('@/views/other/Settings.vue')
-        },{
-            path: "/joinMeeting",
-            name: "加入会议",
-            component: ()=>import('@/views/meeting/JoinMeeting.vue')
-        },{
+            component: () => import('@/views/other/Settings.vue')
+        }, {
             path: "/quickMeeting",
             name: "快速会议",
-            component: ()=>import('@/views/meeting/QuickMeeting.vue')
-        },{
+            component: () => import('@/views/meeting/QuickMeeting.vue')
+        }, {
             path: "/scheduleMeeting",
             name: "预定会议",
-            component: ()=>import('@/views/meeting/ScheduleMeeting.vue')
-        },{
+            component: () => import('@/views/meeting/ScheduleMeeting.vue')
+        }, {
             path: "/screenShare",
             name: "共享屏幕",
-            component: ()=>import('@/views/meeting/ScreenShare.vue')
+            component: () => import('@/views/meeting/ScreenShare.vue')
         }]
-    },{
+    }, {
         path: "/meetingRoom/:meetingId?",
         name: "会议室",
-        component: ()=>import('@/views/meeting/MeetingRoom.vue')
-    },{
+        component: () => import('@/views/meeting/MeetingRoom.vue')
+    }, {
         path: "/screenShareTipbar/:meetingId?",
         name: "屏幕共享提示栏",
-        component: ()=>import('@/views/meeting/ScreenShareTipbar.vue')
+        component: () => import('@/views/meeting/ScreenShareTipbar.vue')
     }]
 })
 

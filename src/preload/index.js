@@ -31,7 +31,10 @@ if (process.contextIsolated) {
       // 监听WebSocket消息
       onWsMessage: (callback) => ipcRenderer.on("ws-message", (event,data)=>callback(data)),
       getGlobalData:()=> global.globalData,
-      setGlobalData:(data) =>{global.globalData = data}
+      setGlobalData:(data) =>{global.globalData = data},
+      minimize:()=> ipcRenderer.send("window-minimize"),
+      maximize:()=> ipcRenderer.send("window-maximize"),
+      close:()=> ipcRenderer.send("window-close")
     });
   } catch (error) {
     console.error(error)

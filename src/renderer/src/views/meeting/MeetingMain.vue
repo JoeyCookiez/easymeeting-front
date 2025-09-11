@@ -5,8 +5,17 @@
                 <div class="features-grid">
                     <div class="feature-card" v-for="item in featureItems" :key="item.route"
                         @click="handleFeatureClick(item)">
-                        <div class="feature-title">{{ item.label }}</div>
-                        <div class="feature-desc">{{ item.desc }}</div>
+                        <div class="feature-card-panel" 
+                        @mouseenter="changeImg(item?.route, item?.enterIcon)"
+                        @mouseleave="changeImg(item?.route, item?.exitIcon)"
+                        >
+                            <div class="feature-card-icon">
+                                <img :src="item?.initIcon" :id="item?.route + '-img'" class="feature-card-img" />
+                            </div>
+                            <p>{{ item?.label }}</p>
+                        </div>
+                        <!-- <div class="feature-title">{{ item.label }}</div> -->
+                        <!-- <div class="feature-desc">{{ item.desc }}</div> -->
                     </div>
                 </div>
             </div>
@@ -90,9 +99,56 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { joinMeeting, preJoinMeeting } from '../../api/meeting'
 import { ElMessage } from 'element-plus'
-import { setSharedState, updateSharedState } from '../../../../main/sharedState'
-import { saveMeetingInfo } from '../../utils/presist'
-
+import { getUserInfo, saveMeetingInfo } from '../../utils/presist'
+import join_normal_new from '../../assets/icons/main_view_join_normal_new.svg'
+import quick_normal from '../../assets/icons/main_view_quick_normal.svg'
+import schedule_normal from '../../assets/icons/main_view_schedule_normal.svg'
+import share_normal from '../../assets/icons/main_view_share_normal.svg'
+import back_hover_enter from '../../assets/apng/main_view_back_hover_enter_1.apng'
+import back_hover_exit from '../../assets/apng/main_view_back_hover_exit_1.apng'
+import join_hover_enter from '../../assets/apng/main_view_join_hover_enter_1.apng'
+import join_hover_exit from '../../assets/apng/main_view_join_hover_exit_1.apng'
+import quick_hover_enter from '../../assets/apng/main_view_quick_hover_enter_1.apng'
+import quick_hover_exit from '../../assets/apng/main_view_quick_hover_exit_1.apng'
+import schedule_hover_enter from '../../assets/apng/main_view_schedule_hover_enter_1.apng'
+import schedule_hover_exit from '../../assets/apng/main_view_schedule_hover_exit_1.apng'
+import schedule_select from '../../assets/apng/main_view_schedule_select_1.apng'
+import share_hover_enter from '../../assets/apng/main_view_share_hover_enter_1.apng'
+import share_hover_exit from '../../assets/apng/main_view_share_hover_exit_1.apng'
+const featureItems = ref([
+    {
+        label: '加入会议',
+        route: '/joinMeeting',
+        desc: '通过会议号或链接加入',
+        initIcon: join_normal_new,
+        enterIcon: join_hover_enter,
+        exitIcon: join_hover_exit
+    },
+    {
+        label: '快速会议',
+        route: '/quickMeeting',
+        desc: '立即发起一个会议',
+        initIcon: quick_normal,
+        enterIcon: quick_hover_enter,
+        exitIcon: quick_hover_exit
+    },
+    {
+        label: '预定会议',
+        route: '/scheduleMeeting',
+        desc: '设定时间并邀请参会人',
+        initIcon: schedule_normal,
+        enterIcon: schedule_hover_enter,
+        exitIcon: schedule_hover_exit
+    },
+    {
+        label: '共享屏幕',
+        route: '/screenShare',
+        desc: '快速共享当前屏幕',
+        initIcon: share_normal,
+        enterIcon: share_hover_enter,
+        exitIcon: share_hover_exit
+    }
+])
 const router = useRouter()
 
 const showJoinDialog = ref(false)
@@ -103,10 +159,17 @@ const joinForm = ref({
     password: '',
     microOpen: false
 })
-
-const handleFeatureClick = (item) => {
+const changeImg = (key, newIcon) => {
+    const imgDom = document.getElementById(key+'-img')
+    imgDom.src = newIcon
+}
+const handleFeatureClick = async(item) => {
     if (item.route === '/joinMeeting') {
+        // 弹出加入会议的窗口
         showJoinDialog.value = true
+        await window.electron.ipcRenderer.invoke("onShowJoinMeetingWindow", {
+            nickName: getUserInfo()?.nickName
+        })
         return
     }
     router.push(item.route)
@@ -172,12 +235,7 @@ const confirmJoinMeeting = async () => {
     })
 }
 
-const featureItems = ref([
-    { label: '加入会议', route: '/joinMeeting', desc: '通过会议号或链接加入' },
-    { label: '快速会议', route: '/quickMeeting', desc: '立即发起一个会议' },
-    { label: '预定会议', route: '/scheduleMeeting', desc: '设定时间并邀请参会人' },
-    { label: '共享屏幕', route: '/screenShare', desc: '快速共享当前屏幕' }
-])
+
 
 const now = ref(new Date())
 onMounted(() => {
@@ -267,6 +325,10 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
         flex: 1;
         padding: 12px 16px 16px 16px;
         box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-right: solid #e2e2e2 1px;
 
         .features-grid {
             display: grid;
@@ -275,7 +337,8 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
         }
 
         .feature-card {
-            border-radius: 12px;
+
+            /*border-radius: 12px;
             background: #f7f9fc;
             padding: 16px;
             cursor: pointer;
@@ -297,6 +360,44 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
             .feature-desc {
                 font-size: 12px;
                 color: #606266;
+            }*/
+        }
+
+        .feature-card-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            // margin: 15px;
+            padding: 18px;
+            p{
+                margin-top: 10px;
+                margin-bottom: 0;
+            }
+            .feature-card-icon {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 64px;
+                height: 64px;
+                // background-color: rgb(26, 125, 255);
+                background: linear-gradient(to right bottom,
+                    rgb(3,113,255) 0%,
+                    rgb(15,119,255) 50%,
+                    rgb(27,125,255) 100%
+                );
+                border-radius: 14px;
+                transition: all 0.2s ease;
+
+                .feature-card-img {
+                    width: 46px;
+                    height: 46px;
+                }
+
+                &:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 10px 10px rgba(0, 0, 0, 0.2);
+                }
             }
         }
     }

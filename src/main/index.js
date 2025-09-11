@@ -3,7 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { saveWindow,getMainWindow } from './windowProxy'
-import { onLoginOrRegister, onLoginSuccess, onSendGeneralMessage, onSendPeerConnection, registerMeetingWindowHandlers } from './ipc'
+import { onLoginOrRegister, onLoginSuccess, onSendGeneralMessage, onSendPeerConnection, onShowJoinMeetingWindow, registerMeetingWindowHandlers } from './ipc'
 
 global.globalData = {
   memberList: []
@@ -52,6 +52,7 @@ onLoginSuccess()
 registerMeetingWindowHandlers()
 onSendPeerConnection()
 onSendGeneralMessage()
+onShowJoinMeetingWindow()
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -102,7 +103,25 @@ ipcMain.on('minimize-window', () => {
     mainWindow.minimize();
   }
 });
-
+// 新的最小化的代码
+ipcMain.on('window-minimize',(event)=>{
+  const win = BrowserWindow.fromWebContents(event.sender)
+  win.minimize()
+})
+// 新的最大化的代码
+ipcMain.on('window-maximize',(event)=>{
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win.isMaximized()) {
+    win.unmaximize()
+  } else {
+    win.maximize()
+  }
+})
+// 新的关闭窗口的代码
+ipcMain.on('window-close',(event)=>{
+  const win = BrowserWindow.fromWebContents(event.sender)
+  win.close()
+})
 // 添加全局变量
 let tray = null;
 
