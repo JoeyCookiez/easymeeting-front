@@ -59,7 +59,7 @@ const changeImg = (imgSrc) => {
     height: var(--top-bar-height);
     flex-wrap: nowrap;
     -webkit-app-region: drag;
-    background-color: rgb(240,240,240);
+    // background-color: rgb(240,240,240);
     /**第一个放左边最后一个放右边 */
     .sys-btn {
         width: 36px;

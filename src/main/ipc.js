@@ -1,7 +1,7 @@
 import { ipcMain, BrowserWindow, screen, session, desktopCapturer } from "electron"
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
-import { getWindow, saveWindow, delWindow } from "./windowProxy"
+import { getWindow, saveWindow, delWindow, getWindowMange } from "./windowProxy"
 import { initWs, sendWSData } from "./wsClient"
 import store from "./store"
 import { getSharedState, setSharedState, updateSharedState } from './sharedState'
@@ -30,7 +30,16 @@ const onLoginOrRegister = () => {
 }
 const onShowJoinMeetingWindow = () => {
     ipcMain.handle("onShowJoinMeetingWindow", (e, payload) => {
-        const {nickName} = payload
+        const { nickName } = payload || {}
+        // 如果已存在窗口，则只显示并聚焦
+        const existing = getWindow("joinMeeting")
+        if (existing && !existing.isDestroyed()) {
+            if (existing.isMinimized()) existing.restore()
+            existing.show()
+            existing.focus()
+            return { ok: true, reused: true, id: existing.id }
+        }
+
         const joinMeetingWindow = new BrowserWindow({
             width: 370,
             height: 500,
@@ -52,7 +61,7 @@ const onShowJoinMeetingWindow = () => {
         })
         // 注册窗口
         saveWindow("joinMeeting", joinMeetingWindow)
-        joinMeetingWindow.on("close", () => { delWindow("joinMeeting") })
+        joinMeetingWindow.once("closed", () => { delWindow("joinMeeting") })
         // 窗口自动居中
         joinMeetingWindow.center()
         // 窗口加载路由页面
@@ -63,6 +72,7 @@ const onShowJoinMeetingWindow = () => {
             const fileUrl = `file://${join(__dirname, '../renderer/index.html')}#${hash}`
             joinMeetingWindow.loadURL(fileUrl)
         }
+        return { ok: true, reused: false, id: joinMeetingWindow.id }
     })
 }
 
@@ -106,12 +116,95 @@ const onSendGeneralMessage = () => {
     })
 }
 
+// 添加获取窗口信息的IPC处理器
+const onGetWindow = () => {
+    ipcMain.handle("getWindow", (e, windowId) => {
+        const window = getWindow(windowId)
+        if (window && !window.isDestroyed()) {
+            return {
+                id: window.id,
+                isVisible: window.isVisible(),
+                isMinimized: window.isMinimized(),
+                isMaximized: window.isMaximized(),
+                isFocused: window.isFocused(),
+                exists: true
+            }
+        }
+        return { exists: false }
+    })
+}
+
+// 添加窗口操作处理器
+const onWindowOperation = () => {
+    ipcMain.handle("windowOperation", (e, windowId, operation) => {
+        const window = getWindow(windowId)
+        if (!window || window.isDestroyed()) {
+            return { success: false, message: '窗口不存在' }
+        }
+        
+        try {
+            switch (operation) {
+                case 'show':
+                    window.show()
+                    window.focus()
+                    break
+                case 'hide':
+                    window.hide()
+                    break
+                case 'minimize':
+                    window.minimize()
+                    break
+                case 'restore':
+                    window.restore()
+                    break
+                case 'maximize':
+                    window.maximize()
+                    break
+                case 'unmaximize':
+                    window.unmaximize()
+                    break
+                case 'close':
+                    window.close()
+                    break
+                default:
+                    return { success: false, message: '未知操作' }
+            }
+            return { success: true }
+        } catch (error) {
+            return { success: false, message: error.message }
+        }
+    })
+}
+
+const onGetWindowManage = () => {
+    ipcMain.handle("getWindowManage", () => {
+        const windowManage = getWindowMange()
+        // 只返回窗口的基本信息，不返回整个BrowserWindow对象
+        const result = {}
+        for (const [key, window] of Object.entries(windowManage)) {
+            if (window && !window.isDestroyed()) {
+                result[key] = {
+                    id: window.id,
+                    isVisible: window.isVisible(),
+                    isMinimized: window.isMinimized(),
+                    isMaximized: window.isMaximized(),
+                    isFocused: window.isFocused()
+                }
+            }
+        }
+        return result
+    })
+}
+
 export {
     onLoginOrRegister,
     onLoginSuccess,
     onSendPeerConnection,
     onSendGeneralMessage,
-    onShowJoinMeetingWindow
+    onShowJoinMeetingWindow,
+    onGetWindow,
+    onGetWindowManage,
+    onWindowOperation
 }
 
 // 会议室窗口：注册打开与控制事件

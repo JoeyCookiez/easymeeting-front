@@ -14,7 +14,7 @@
             <CommonInput title="入会开启麦克风" key="microOpen" inputType="checkbox" v-model="formData.microOpen" />
             <!-- <el-button :class="['common-btn', isActive ? 'btn-active' : 'btn-inactive']">加入会议</el-button> -->
 
-            <div :class="['common-btn', isActive ? 'btn-active' : 'btn-inactive']">加入会议</div>
+            <div :class="['common-btn', isActive ? 'btn-active' : 'btn-inactive']" @click="handleJoinMeeting">加入会议</div>
 
         </div>
         <!-- <el-form label-width="80px" class="form-area">
@@ -29,11 +29,12 @@
 </template>
 <!-- 130,184,255   141,190,255    3,113,255 27,125,255 -->
 <script setup>
-import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import TopBar from '../../components/TopBar.vue'
 import CommonInput from '../../components/CommonInput.vue'
 const router = useRouter()
+const route = useRoute()
 const meetingId = ref('')
 const meetingNoMaxLen = 9
 const isActive = ref(false)
@@ -42,11 +43,14 @@ const nickName = ref()
 const formData = reactive({
     meetingId: '',
     meetingNo: '',
-    nickName: '',
-    audioOn: '',
-    videoOpen: '',
-    microOpen: ''
+    nickName: route.query.nickName,
+    audioOn: true,
+    videoOpen: false,
+    microOpen: true
 })
+const handleJoinMeeting = ()=>{
+    console.log(formData)
+}
 const handleCurrentChange = (param, val) => {
     console.log(param, val)
     if (val.replaceAll(' ', '').length % 3 === 0 && val.length !== 0 && param === 'meetingNo') {
@@ -72,6 +76,9 @@ const goMeeting = async () => {
         router.push({ path: `/meetingRoom/${encodeURIComponent(id)}`, query: { nickName: '我', video: '0' } })
     }
 }
+onMounted(()=>{
+    console.log("路径传参:",route.query)
+})
 </script>
 
 <style lang="scss" scoped>

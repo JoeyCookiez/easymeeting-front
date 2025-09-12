@@ -115,6 +115,7 @@ import schedule_hover_exit from '../../assets/apng/main_view_schedule_hover_exit
 import schedule_select from '../../assets/apng/main_view_schedule_select_1.apng'
 import share_hover_enter from '../../assets/apng/main_view_share_hover_enter_1.apng'
 import share_hover_exit from '../../assets/apng/main_view_share_hover_exit_1.apng'
+// 移除直接导入主进程模块，改为使用IPC调用
 const featureItems = ref([
     {
         label: '加入会议',
@@ -165,8 +166,7 @@ const changeImg = (key, newIcon) => {
 }
 const handleFeatureClick = async(item) => {
     if (item.route === '/joinMeeting') {
-        // 弹出加入会议的窗口
-        showJoinDialog.value = true
+        // 始终由主进程负责创建/复用窗口
         await window.electron.ipcRenderer.invoke("onShowJoinMeetingWindow", {
             nickName: getUserInfo()?.nickName
         })
