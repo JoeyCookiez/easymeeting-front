@@ -5,10 +5,8 @@
                 <div class="features-grid">
                     <div class="feature-card" v-for="item in featureItems" :key="item.route"
                         @click="handleFeatureClick(item)">
-                        <div class="feature-card-panel" 
-                        @mouseenter="changeImg(item?.route, item?.enterIcon)"
-                        @mouseleave="changeImg(item?.route, item?.exitIcon)"
-                        >
+                        <div class="feature-card-panel" @mouseenter="changeImg(item?.route, item?.enterIcon)"
+                            @mouseleave="changeImg(item?.route, item?.exitIcon)">
                             <div class="feature-card-icon">
                                 <img :src="item?.initIcon" :id="item?.route + '-img'" class="feature-card-img" />
                             </div>
@@ -161,10 +159,10 @@ const joinForm = ref({
     microOpen: false
 })
 const changeImg = (key, newIcon) => {
-    const imgDom = document.getElementById(key+'-img')
+    const imgDom = document.getElementById(key + '-img')
     imgDom.src = newIcon
 }
-const handleFeatureClick = async(item) => {
+const handleFeatureClick = async (item) => {
     if (item.route === '/joinMeeting') {
         // 始终由主进程负责创建/复用窗口
         await window.electron.ipcRenderer.invoke("onShowJoinMeetingWindow", {
@@ -264,7 +262,6 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
     height: 100%;
     display: flex;
     flex-direction: column;
-
     .window-header {
         display: flex;
         justify-content: space-between;
@@ -336,44 +333,21 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
             grid-gap: 12px;
         }
 
-        .feature-card {
-
-            /*border-radius: 12px;
-            background: #f7f9fc;
-            padding: 16px;
-            cursor: pointer;
-            transition: transform .15s ease, box-shadow .15s ease;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-
-            &:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
-            }
-
-            .feature-title {
-                font-size: 16px;
-                font-weight: 600;
-                color: #1f2d3d;
-                margin-bottom: 6px;
-            }
-
-            .feature-desc {
-                font-size: 12px;
-                color: #606266;
-            }*/
-        }
-
         .feature-card-panel {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             // margin: 15px;
+            cursor: pointer;
             padding: 18px;
-            p{
+            -webkit-app-region: no-drag;
+
+            p {
                 margin-top: 10px;
                 margin-bottom: 0;
             }
+
             .feature-card-icon {
                 display: flex;
                 align-items: center;
@@ -382,10 +356,9 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
                 height: 64px;
                 // background-color: rgb(26, 125, 255);
                 background: linear-gradient(to right bottom,
-                    rgb(3,113,255) 0%,
-                    rgb(15,119,255) 50%,
-                    rgb(27,125,255) 100%
-                );
+                        rgb(3, 113, 255) 0%,
+                        rgb(15, 119, 255) 50%,
+                        rgb(27, 125, 255) 100%);
                 border-radius: 14px;
                 transition: all 0.2s ease;
 
