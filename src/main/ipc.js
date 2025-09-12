@@ -38,7 +38,7 @@ const onShowJoinMeetingWindow = () => {
             show: true,
             autoHideMenuBar: true,
             frame: false,
-            resizable: true,
+            resizable: false,
             transparent: true,
             webPreferences: {
                 preload: join(__dirname, '../preload/index.js'),

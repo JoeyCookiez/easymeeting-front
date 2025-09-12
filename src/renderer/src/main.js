@@ -5,6 +5,7 @@ import './assets/main.css'
 import { createApp } from 'vue'
 import router from '@/router'
 import * as Pinia from 'pinia'
+import './assets/variable.css'
 const app = createApp(App)
 app.use(Pinia.createPinia())
 app.use(ElementPlus)

@@ -1,5 +1,5 @@
 <template>
-    <span class="title-span">
+    <span class="title-span" :style="{borderTopLeftRadius: borderRadius,borderTopRightRadius: borderRadius}">
         <!-- 空div主要用来让中间的居中 -->
         <div class="mid-panel">{{ title }}</div>
         <div class="right-panel">
@@ -30,7 +30,8 @@ const props = defineProps({
     title: { type: String, default: '' },
     isMin: { type: Boolean, default: true },
     isMax: { type: Boolean, default: true },
-    isClose: { type: Boolean, default: true }
+    isClose: { type: Boolean, default: true },
+    borderRadius: { type: Number, default: 8 }
 })
 const handleSysOperation = (type) => {
     switch (type) {
@@ -55,14 +56,14 @@ const changeImg = (imgSrc) => {
 .title-span {
     display: flex;
     justify-content: center;
-    height: 36px;
+    height: var(--top-bar-height);
     flex-wrap: nowrap;
     -webkit-app-region: drag;
-
+    background-color: rgb(240,240,240);
     /**第一个放左边最后一个放右边 */
     .sys-btn {
-        width: 30px;
-        height: 30px;
+        width: 36px;
+        height: 36px;
         display: flex;
         align-items: center;
         justify-content: center;

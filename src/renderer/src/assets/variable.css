@@ -1,0 +1,9 @@
+/* src/assets/variables.css */
+:root {
+  --main-color: #42b983;
+  --font-size-large: 20px;
+  --panel-padding: 16px;
+  --panel-margin: 24px;
+  --panel-margin-bottom: 8px;
+  --top-bar-height: 36px;
+}
