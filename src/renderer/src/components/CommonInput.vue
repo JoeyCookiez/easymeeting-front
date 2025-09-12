@@ -6,15 +6,15 @@
       </div>
       <div class="common-input-area" :style="{ height: height + 'px' }">
         <!-- 绑定 ref -->
-        <input ref="inputRef" :value="modelValue" @input="onInput" class="common-input" />
-        <img v-if="clearable && modelValue" :src="dark_close" @click="clearInput" />
+        <input ref="inputRef" v-bind:onfocus="handleClick" v-on:focusout="()=>isFocus = false" :value="modelValue" @input="onInput" class="common-input" />
+        <img v-if="clearable && modelValue &&isFocus" :src="dark_close" @mousedown.prevent="clearInput" />
       </div>
     </div>
 
     <div v-if="inputType === 'checkbox'" class="common-check-area">
       <!-- <input type="checkbox" class="checkbox-input"></input> -->
-      <div :class="['checkbox', checkVal ? 'box-checked' : 'box-unchecked']" @click="handleCheck">
-        <img v-if="checkVal" :src="check_icon" />
+      <div :class="['checkbox', checked ? 'box-checked' : 'box-unchecked']" @click="handleCheck">
+        <img v-if="checked" :src="check_icon" />
       </div>
       <div :style="{ fontSize: fontSize + 'px' }">{{ title }}</div>
     </div>
@@ -22,15 +22,15 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits, ref } from 'vue'
+import { defineProps, defineEmits, ref, computed } from 'vue'
 import dark_close from '../assets/icons/dark_close_icon.svg'
 import check_icon from '../assets/icons/meeting_control_checked.svg'
 // const isChecked = ref(false)
-const checkVal = ref(false)
+const isFocus = ref(false)
 const props = defineProps({
   modelValue: {
-    type: [Number, String],
-    default: ''
+    type: [Number, String, Boolean],
+    default: '0'
   },
   inputType: {
     type: String,
@@ -44,21 +44,34 @@ const props = defineProps({
   maxLen: { type: Number, default: 10 }
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'change'])
+const checked = computed({
+  get: () => props.modelValue === '1' || props.modelValue === 1 || props.modelValue === true,
+  set: (v) => {
+    const out = v ? '1' : '0'          // ✅ setter：往父组件发 '1' / '0'
+    emit('update:modelValue', out)
+    emit('change', out)
+  }
+})
+const handleClick = ()=>{
+  isFocus.value = true
+}
 const handleCheck = () => {
-  checkVal.value = !checkVal.value
+  checked.value = !checked.value
 }
 const inputRef = ref(null)
 function countSpaces(str) {
   return str.split(' ').length - 1;
 }
-const onInput = (event) => {
-  let val = event.target.value
-  if (val.replaceAll(' ', '').length > props.maxLen) {
-    val = val.slice(0, maxLen + countSpaces(val))
-    event.target.value = val
+const onInput = (e) => {
+  let val = e.target.value
+  const noSpaces = val.replaceAll(' ', '')
+  if (noSpaces.length > props.maxLen) {
+    // 截断到 maxLen（这里简单处理，不补空格）
+    val = noSpaces.slice(0, props.maxLen)
+    e.target.value = val
   }
-  emit('update:modelValue', event.target.value)
+  emit('update:modelValue', val)
 }
 
 const clearInput = () => {
@@ -131,8 +144,8 @@ const clearInput = () => {
     border: 2px solid rgb(25, 140, 255);
 
     &:hover {
-      background-color: rgb(25,140,255);
-      border: 2px solid rgb(25,140,255);
+      background-color: rgb(25, 140, 255);
+      border: 2px solid rgb(25, 140, 255);
     }
   }
 

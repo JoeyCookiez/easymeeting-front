@@ -134,7 +134,7 @@ const meetingInfo = ref({
 	createUserId: "277350997476"
 })
 const curMemberList = ref([])
-const meetingId = computed(() => route.params.meetingId)
+const meetingNo = computed(() => route.params.meetingNo)
 const nickName = computed(() => route.query.nickName || '')
 const localStream = ref(null)
 const isMuted = ref(route.query.micro !== '1')
@@ -980,7 +980,7 @@ const startScreenShare = async (source) => {
 
 		// 创建tipbar窗口
 		await window.api.createScreenShareTipbar({
-			meetingId: meetingId.value,
+			meetingNo: meetingNo.value,
 			nickName: nickName.value,
 			isMuted: isMuted.value,
 			cameraOn: cameraOn.value,

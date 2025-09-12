@@ -9,7 +9,8 @@
             <div>
                 <p>会议设置</p>
             </div>
-            <CommonInput title="自动连接音频" key="audioOn" inputType="checkbox" v-model="formData.audioOn" />
+            <CommonInput title="自动连接音频" key="audioOn" inputType="checkbox" v-model="formData.audioOn"
+                @change="v => console.log('audioOn:', v)" />
             <CommonInput title="入会开启摄像头" key="videoOpen" inputType="checkbox" v-model="formData.videoOpen" />
             <CommonInput title="入会开启麦克风" key="microOpen" inputType="checkbox" v-model="formData.microOpen" />
             <!-- <el-button :class="['common-btn', isActive ? 'btn-active' : 'btn-inactive']">加入会议</el-button> -->
@@ -33,6 +34,9 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TopBar from '../../components/TopBar.vue'
 import CommonInput from '../../components/CommonInput.vue'
+import { joinMeeting, preJoinMeeting } from '../../api/meeting'
+import { saveMeetingInfo } from '../../utils/presist'
+import { ElMessage } from 'element-plus'
 const router = useRouter()
 const route = useRoute()
 const meetingId = ref('')
@@ -41,18 +45,50 @@ const isActive = ref(false)
 const meetingNo = ref()
 const nickName = ref()
 const formData = reactive({
-    meetingId: '',
     meetingNo: '',
     nickName: route.query.nickName,
-    audioOn: true,
-    videoOpen: false,
-    microOpen: true
+    audioOn: '1',
+    videoOpen: '0',
+    microOpen: '1'
 })
-const handleJoinMeeting = ()=>{
-    console.log(formData)
+const handleJoinMeeting = async () => {
+    try {
+        // 这里预留真实入会前置与入会逻辑（已注释的接口调用）
+        console.log(formData)
+        const preJoinRes = await preJoinMeeting(formData)
+        if (preJoinRes.code != 200) {
+            ElMessage.error(preJoinRes?.message)
+            return
+        }
+        const joinRes = await joinMeeting({
+            videoOpen: formData.videoOpen === '1' ? '1' : '0',
+            microOpen: formData.microOpen === '1' ? '1' : '0'
+        })
+        if (joinRes.code != 200) {
+            ElMessage.error(joinRes?.message)
+            return
+        }
+        saveMeetingInfo(joinRes?.data)
+        await window.electron.ipcRenderer.invoke("openMeetingWindow", {
+            meetingNo: formData.meetingNo.replaceAll(' ',''),
+            nickName: formData.nickName,
+            video: formData.videoOpen,
+            micro: formData.microOpen
+        })
+
+    } catch(e){
+        console.log("进入会议室失败",e)
+    }finally {
+        // 无论成功与否，尝试关闭加入会议窗口
+        try {
+            // await window.electron.ipcRenderer.invoke('windowOperation', 'joinMeeting', 'close')
+        } catch (e) {
+            // 忽略关闭失败
+        }
+    }
 }
 const handleCurrentChange = (param, val) => {
-    console.log(param, val)
+    // console.log(param, val)
     if (val.replaceAll(' ', '').length % 3 === 0 && val.length !== 0 && param === 'meetingNo') {
         formData.meetingNo += ' '
     }
@@ -76,8 +112,8 @@ const goMeeting = async () => {
         router.push({ path: `/meetingRoom/${encodeURIComponent(id)}`, query: { nickName: '我', video: '0' } })
     }
 }
-onMounted(()=>{
-    console.log("路径传参:",route.query)
+onMounted(() => {
+    console.log("路径传参:", route.query)
 })
 </script>
 
@@ -96,6 +132,7 @@ onMounted(()=>{
     height: calc(100% - var(--top-bar-height));
     border-bottom-left-radius: 6px;
     border-bottom-right-radius: 6px;
+
     &>* {
         margin-bottom: var(--panel-margin-bottom);
     }
@@ -123,6 +160,7 @@ onMounted(()=>{
 .btn-active {
     background-color: rgb(0, 102, 255);
     color: white;
+    cursor: pointer;
 
     &:hover {
         background-color: rgb(0, 85, 232);

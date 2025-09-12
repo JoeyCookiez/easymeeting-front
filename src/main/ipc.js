@@ -211,7 +211,7 @@ export {
 export function registerMeetingWindowHandlers() {
     // 打开会议室窗口
     ipcMain.handle('openMeetingWindow', (e, payload) => {
-        const { meetingId, nickName, video } = payload || {}
+        const { meetingNo,nickName, video, micro } = payload || {}
         const meetingWindow = new BrowserWindow({
             width: 1000,
             height: 710,
@@ -234,7 +234,7 @@ export function registerMeetingWindowHandlers() {
             }
         })
 
-        const idKey = `meeting-${meetingId || Date.now()}`
+        const idKey = `meeting-${meetingNo || Date.now()}`
         saveWindow(idKey, meetingWindow)
         meetingWindow.on('closed', () => delWindow(idKey))
 
@@ -259,7 +259,7 @@ export function registerMeetingWindowHandlers() {
             })
         }, { useSystemPicker: false })
 
-        const hash = `/meetingRoom/${encodeURIComponent(meetingId || '')}?nickName=${encodeURIComponent(nickName || '')}&video=${video ? '1' : '0'}`
+        const hash = `/meetingRoom/meetingNo=${encodeURIComponent(meetingNo || '')}?nickName=${encodeURIComponent(nickName || '')}&video=${video ==='1' ? '1' : '0'}&micro=${micro === '1' ? '1':'0'}`
         if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
             meetingWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/#${hash}`)
         } else {
