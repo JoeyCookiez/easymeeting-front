@@ -45,7 +45,7 @@ const isActive = ref(false)
 const meetingNo = ref()
 const nickName = ref()
 const formData = reactive({
-    meetingNo: '',
+    meetingNo: '123 456 789',
     nickName: route.query.nickName,
     audioOn: '1',
     videoOpen: '0',
@@ -75,13 +75,13 @@ const handleJoinMeeting = async () => {
             video: formData.videoOpen,
             micro: formData.microOpen
         })
-
+        await window.electron.ipcRenderer.invoke('windowOperation', 'joinMeeting', 'close')
     } catch(e){
         console.log("进入会议室失败",e)
     }finally {
         // 无论成功与否，尝试关闭加入会议窗口
         try {
-            // await window.electron.ipcRenderer.invoke('windowOperation', 'joinMeeting', 'close')
+            
         } catch (e) {
             // 忽略关闭失败
         }
@@ -114,6 +114,9 @@ const goMeeting = async () => {
 }
 onMounted(() => {
     console.log("路径传参:", route.query)
+    if(formData.meetingNo.replaceAll(' ','').length>=meetingNoMaxLen){
+        isActive.value = true
+    }
 })
 </script>
 

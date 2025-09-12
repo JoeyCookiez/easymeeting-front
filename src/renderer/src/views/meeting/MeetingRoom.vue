@@ -3,7 +3,7 @@
 		<!-- 顶部标题栏 -->
 		<div class="top-bar">
 			<div class="left">
-				<div class="title">会议 {{ meetingId || '—' }}</div>
+				<div class="title">会议 {{ meetingNo || '—' }}</div>
 				<div class="sub">{{ nickName ? `您以「${nickName}」加入` : '您已加入会议' }}</div>
 			</div>
 			<div class="mid-bar">
