@@ -32,6 +32,7 @@ if (process.contextIsolated) {
       onWsMessage: (callback) => ipcRenderer.on("ws-message", (event,data)=>callback(data)),
       getGlobalData:()=> global.globalData,
       setGlobalData:(data) =>{global.globalData = data},
+      showChatRoom:(data)=>ipcRenderer.invoke("onShowChatRoom", data),
       minimize:()=> ipcRenderer.send("window-minimize"),
       maximize:()=> ipcRenderer.send("window-maximize"),
       close:()=> ipcRenderer.send("window-close")

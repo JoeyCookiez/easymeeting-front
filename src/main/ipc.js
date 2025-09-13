@@ -5,12 +5,13 @@ import { getWindow, saveWindow, delWindow, getWindowMange } from "./windowProxy"
 import { initWs, sendWSData } from "./wsClient"
 import store from "./store"
 import { getSharedState, setSharedState, updateSharedState } from './sharedState'
+import { appConfig } from "./config"
 
 const onLoginOrRegister = () => {
     ipcMain.handle("onLoginOrRegister", (e, isLogin) => {
-        const login_width = 375
-        const login_height = 400
-        const register_height = 570
+        const login_width = appConfig.LOGIN_INIT_WIDTH
+        const login_height = appConfig.LOGIN_INIT_HEIGHT
+        const register_height = appConfig.REIGISTER_INIT_HEIGHT
         const mainWindow = getWindow("main")
 
         // 允许调整窗口大小
@@ -41,8 +42,8 @@ const onShowJoinMeetingWindow = () => {
         }
 
         const joinMeetingWindow = new BrowserWindow({
-            width: 370,
-            height: 500,
+            width: appConfig.JOINMEETING_INIT_WIDTH,
+            height: appConfig.JOINMEETING_INIT_HEIGHT,
             useContentSize: true, // 设置内容区域尺寸
             show: true,
             autoHideMenuBar: true,
@@ -79,8 +80,8 @@ const onShowJoinMeetingWindow = () => {
 const onLoginSuccess = () => {
     ipcMain.handle("onLoginSuccess", (e, userInfo, wsUrl) => {
         const mainWindow = getWindow("main");
-        const width = 720;
-        const height = 480;
+        const width = appConfig.HOME_INIT_WIDTH;
+        const height = appConfig.HOME_INIT_HEIGHT;
 
         // 获取主屏幕的尺寸信息
         const primaryDisplay = screen.getPrimaryDisplay();
@@ -195,6 +196,19 @@ const onGetWindowManage = () => {
         return result
     })
 }
+const onShowChatRoom = ()=>{
+    ipcMain.handle("onShowChatRoom",async(event,data)=>{
+        console.log("showChatRoom",data)
+        const win = BrowserWindow.fromWebContents(event.sender)
+        win.setResizable(true)
+        if(data?.show){
+            win.setSize(appConfig.MEETINGROOM_CHAT_WIDTH,appConfig.MEETINGROOM_INIT_HEIGHT)
+        }else{
+            win.setSize(appConfig.MEETINGROOM_INIT_WIDTH,appConfig.MEETINGROOM_INIT_HEIGHT)
+        }
+        
+    })
+}
 
 export {
     onLoginOrRegister,
@@ -204,7 +218,8 @@ export {
     onShowJoinMeetingWindow,
     onGetWindow,
     onGetWindowManage,
-    onWindowOperation
+    onWindowOperation,
+    onShowChatRoom
 }
 
 // 会议室窗口：注册打开与控制事件
@@ -213,11 +228,11 @@ export function registerMeetingWindowHandlers() {
     ipcMain.handle('openMeetingWindow', (e, payload) => {
         const { meetingNo,nickName, video, micro } = payload || {}
         const meetingWindow = new BrowserWindow({
-            width: 1000,
-            height: 710,
+            width: appConfig.MEETINGROOM_INIT_WIDTH,
+            height: appConfig.MEETINGROOM_INIT_HEIGHT,
             useContentSize: true, // 设置内容区域尺寸
-            minWidth: 1024,
-            minHeight: 640,
+            // minWidth: 1024,
+            // minHeight: 640,
             show: true,
             autoHideMenuBar: true,
             frame: false,

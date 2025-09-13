@@ -38,69 +38,81 @@
 
 
 		<!-- 主体：视频网格 -->
-		<div class="content" @click="cancelExit">
-			<div class="video-area">
-				<div class="grid" :class="gridType">
-					<div class="video-card self" :class="{ muted: isMuted || !micAvailable, cameraOff: !cameraOn }">
-						<div class="avatar" v-if="!cameraOn">{{ avatarInitial }}</div>
-						<video v-else autoplay muted playsinline ref="localVideo"></video>
-						<div class="name-tag">{{ nickName || '我' }}</div>
-					</div>
-					<div class="video-card" v-for="member in filteredMemberList">
-						<div class="avatar" v-if="!member?.openVideo">{{ member?.nickName?.slice(0, 1).toUpperCase() }}
+		<div class="mid-container">
+			<div class="left-panel">
+				<div class="content" @click="cancelExit">
+					<div class="video-area">
+						<div class="grid" :class="gridType">
+							<div class="video-card self"
+								:class="{ muted: isMuted || !micAvailable, cameraOff: !cameraOn }">
+								<div class="avatar" v-if="!cameraOn">{{ avatarInitial }}</div>
+								<video v-else autoplay muted playsinline ref="localVideo"></video>
+								<div class="name-tag">{{ nickName || '我' }}</div>
+							</div>
+							<div class="video-card" v-for="member in filteredMemberList">
+								<div class="avatar" v-if="!member?.openVideo">{{ member?.nickName?.slice(0,
+									1).toUpperCase()
+									}}
+								</div>
+								<video v-show="member?.openVideo" autoplay playsinline
+									:ref="el => setVideoRef(el, member?.userId)"
+									@loadedmetadata="handleVideoLoaded($event, member?.userId)"></video>
+								<div class="name-tag">{{ member?.nickName }}</div>
+							</div>
+
 						</div>
-						<video v-show="member?.openVideo" autoplay playsinline
-							:ref="el => setVideoRef(el, member?.userId)"
-							@loadedmetadata="handleVideoLoaded($event, member?.userId)"></video>
-						<div class="name-tag">{{ member?.nickName }}</div>
+					</div>
+				</div>
+
+				<!-- 底部控制栏 -->
+				<div class="bottom-bar">
+					<div class="comments">
+						<div class="comment-input-area">
+							<img :src="face_line" width="20" height="20" />
+							<input v-model="commentInput" class="comment-input" placeholder="说点什么..." />
+						</div>
 					</div>
 
+					<div class="controls">
+						<IconWithTitle :svgSrc="microOn ? mic_on : mic_off" :title="microOn ? '禁音' : '解除禁音'"
+							@click="toggleMute">
+						</IconWithTitle>
+						<IconWithTitle :svgSrc="cameraOn ? video_on : video_off" :title="cameraOn ? '停止视频' : '开启视频'"
+							@click="toggleCamera"></IconWithTitle>
+						<IconWithTitle :svgSrc="screen_share" title="共享屏幕" :iconSize="24" @click="shareScreen">
+						</IconWithTitle>
+						<IconWithTitle :svgSrc="invite_on" title="邀请" :iconSize="24" @click="invite"></IconWithTitle>
+						<IconWithTitle :svgSrc="member_on" title="成员" :iconSize="24" @click="toggleMembers">
+						</IconWithTitle>
+						<IconWithTitle :svgSrc="chat_on" title="聊天" @click="toggleChat"></IconWithTitle>
+						<IconWithTitle :svgSrc="recording ? record_on : record_off" :title="recording ? '停止录制' : '录制'"
+							@click="toggleRecord">
+
+						</IconWithTitle>
+						<!-- <el-button @click="toggleRecord">{{ recording ? '停止录制' : '录制' }}</el-button> -->
+					</div>
+					<div class="actions">
+
+						<IconWithTitle v-if="!isClickExit" @click="toggleExitBubble(1)" :svgSrc="exit_meeting_on"
+							:title="meetingInfo?.createUserId === userInfo?.userId ? '结束会议' : '离开会议'" />
+						<!-- <el-button v-else @click="cancelExit">取消</el-button> -->
+						<div v-else class="cancel-area" @click="cancelExit">取消</div>
+						<div v-if="isExitBottom" class="bottom-exit-bubble">
+							<el-button type="danger" v-if="meetingInfo?.createUserId === userInfo?.userId"
+								@click="handleFinishMeeting">结束会议</el-button>
+							<el-button @click="controlWindow('close')">离开会议</el-button>
+						</div>
+					</div>
 				</div>
+			</div>
+			<div class="right-panel">
+				<CHatRoom />
 			</div>
 		</div>
-
-		<!-- 底部控制栏 -->
-		<div class="bottom-bar">
-			<div class="comments">
-				<div class="comment-input-area">
-					<img :src="face_line" width="20" height="20" />
-					<input v-model="commentInput" class="comment-input" placeholder="说点什么..." />
-				</div>
-			</div>
-
-			<div class="controls">
-				<IconWithTitle :svgSrc="microOn ? mic_on : mic_off" :title="microOn ? '禁音' : '解除禁音'"
-					@click="toggleMute">
-				</IconWithTitle>
-				<IconWithTitle :svgSrc="cameraOn ? video_on : video_off" :title="cameraOn ? '停止视频' : '开启视频'"
-					@click="toggleCamera"></IconWithTitle>
-				<IconWithTitle :svgSrc="screen_share" title="共享屏幕" :iconSize="24" @click="shareScreen"></IconWithTitle>
-				<IconWithTitle :svgSrc="invite_on" title="邀请" :iconSize="24" @click="invite"></IconWithTitle>
-				<IconWithTitle :svgSrc="member_on" title="成员" :iconSize="24" @click="toggleMembers"></IconWithTitle>
-				<IconWithTitle :svgSrc="chat_on" title="聊天" @click="toggleChat"></IconWithTitle>
-				<IconWithTitle :svgSrc="recording ? record_on : record_off" :title="recording ? '停止录制' : '录制'"
-					@click="toggleRecord">
-
-				</IconWithTitle>
-				<!-- <el-button @click="toggleRecord">{{ recording ? '停止录制' : '录制' }}</el-button> -->
-			</div>
-			<div class="actions">
-
-				<IconWithTitle v-if="!isClickExit" @click="toggleExitBubble(1)" :svgSrc="exit_meeting_on"
-					:title="meetingInfo?.createUserId === userInfo?.userId ? '结束会议' : '离开会议'" />
-				<!-- <el-button v-else @click="cancelExit">取消</el-button> -->
-				<div v-else class="cancel-area" @click="cancelExit">取消</div>
-				<div v-if="isExitBottom" class="bottom-exit-bubble">
-					<el-button type="danger" v-if="meetingInfo?.createUserId === userInfo?.userId"
-						@click="handleFinishMeeting">结束会议</el-button>
-					<el-button @click="controlWindow('close')">离开会议</el-button>
-				</div>
-			</div>
-		</div>
-
 		<!-- 屏幕共享选择弹窗 -->
 		<ScreenShareDialog :visible="showScreenShareDialog" @close="closeScreenShareDialog" @share="startScreenShare" />
 	</div>
+
 </template>
 
 <script setup>
@@ -126,6 +138,7 @@ import exit_meeting_on from '../../assets/icons/exit_meeting.svg'
 import face_line from '../../assets/icons/face_line.svg'
 import layout_fill from '../../assets/icons/layout_on.svg'
 import { getMeetingInfo } from '../../utils/presist'
+import CHatRoom from '../../components/CHatRoom.vue'
 const userStore = useUserInfoStore()
 const route = useRoute()
 const router = useRouter()
@@ -165,6 +178,7 @@ const SIGNAL_TYPE_ANSWER = 'answer'
 const SIGNAL_TYPE_CANDIDATE = 'candidate'
 const isClickExit = ref(false) // 是否点击了离开会议的按钮，如果点击了就让按钮变成取消
 const videoRefs = ref({})
+const isShowChat = ref(false)
 const setVideoRef = (el, userId) => {
 	if (el) {
 		videoRefs.value[userId] = el
@@ -1012,7 +1026,11 @@ const startScreenShare = async (source) => {
 
 const invite = () => { ElMessage.info('邀请功能开发中') }
 const toggleMembers = () => { ElMessage.info('成员列表开发中') }
-const toggleChat = () => { ElMessage.info('聊天面板开发中') }
+const toggleChat = async () => {
+	// ElMessage.info('聊天面板开发中')
+	isShowChat.value = !isShowChat.value
+	await window.electronAPI.showChatRoom({ show: isShowChat.value })
+}
 const toggleRecord = () => {
 	recording.value = !recording.value
 
@@ -1043,7 +1061,7 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	position: relative;
 	display: flex;
 	flex-direction: column;
-	width: 100%;
+	// width: var(--meeting-room-width);
 	height: 100%;
 	background: #0f1114;
 	color: #fff;
@@ -1154,6 +1172,7 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	height: 30px;
 	border-top-left-radius: 8px;
 	border-top-right-radius: 8px;
+
 	.left {
 		width: 250px;
 
@@ -1259,6 +1278,7 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	padding: 10px;
 	background-color: #dde5f4;
 	box-sizing: border-box;
+	width: 1000px;
 }
 
 .video-area {
@@ -1334,18 +1354,32 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 		background: #000;
 	}
 }
-
-
-
+.mid-container{
+	display: flex;
+}
+.left-panel{
+	display: flex;
+	flex-direction: column;
+	height: calc(100vh - 50px);
+}
+.right-panel{
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	border-left: 2px solid #afafaf;
+}
 .bottom-bar {
 	display: flex;
 	justify-content: space-between;
 	padding: 10px;
 	height: 60px;
+	box-sizing: border-box;
 	background-color: #616ed0;
 	align-items: center;
+	width: 1000px;
 	border-bottom-left-radius: 8px;
 	border-bottom-right-radius: 8px;
+
 	.comment-input-area {
 		display: flex;
 		background-color: rgb(240, 240, 240);

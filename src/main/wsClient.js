@@ -40,7 +40,7 @@ const connectWs = () => {
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data)
-        console.log("收到消息:", data)
+        // console.log("收到消息:", data)
         const { messageType, messageContent } = data
         
         // 向所有窗口广播消息（包括主窗口和会议室窗口）
