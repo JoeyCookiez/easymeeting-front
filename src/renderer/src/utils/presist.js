@@ -25,11 +25,21 @@ const saveUserStatus = (data)=>{
     return
 }
 
+const getInMeeting = ()=>{
+    return localStorage.getItem("inMeeting") === 'true' ? true : false
+}
+
+const saveInMeeting = (inMeeting)=>{
+    localStorage.setItem("inMeeting",inMeeting)
+    return
+}
 export {
     getMeetingInfo,
     saveMeetingInfo,
     getUserInfo,
     saveUserInfo,
     getUserStatus,
-    saveUserStatus
+    saveUserStatus,
+    getInMeeting,
+    saveInMeeting
 }

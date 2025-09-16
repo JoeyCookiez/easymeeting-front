@@ -30,6 +30,9 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('electronAPI', {
       // 监听WebSocket消息
       onWsMessage: (callback) => ipcRenderer.on("ws-message", (event,data)=>callback(data)),
+      // 渲染进程间传递消息
+      onTunnelMessage:(callback) => ipcRenderer.on("tunnel-message",(e,data)=>callback(data)),
+      sendTunnelMessage:(data)=>ipcRenderer.invoke("onSendTunnelMessage",data),
       getGlobalData:()=> global.globalData,
       setGlobalData:(data) =>{global.globalData = data},
       showChatRoom:(data)=>ipcRenderer.invoke("onShowChatRoom", data),

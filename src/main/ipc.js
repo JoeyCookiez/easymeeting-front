@@ -209,6 +209,15 @@ const onShowChatRoom = ()=>{
         
     })
 }
+const onSendTunnelMessage = ()=>{
+    ipcMain.handle("onSendTunnelMessage",(event,message)=>{
+        const {winKey,data} = message
+        console.log(message)
+        const win = getWindow(winKey)
+        win?.webContents?.send("tunnel-message",data)
+    })
+}
+
 
 export {
     onLoginOrRegister,
@@ -219,7 +228,8 @@ export {
     onGetWindow,
     onGetWindowManage,
     onWindowOperation,
-    onShowChatRoom
+    onShowChatRoom,
+    onSendTunnelMessage
 }
 
 // 会议室窗口：注册打开与控制事件

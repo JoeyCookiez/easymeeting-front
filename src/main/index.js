@@ -1,9 +1,9 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, Tray, Menu,session, desktopCapturer } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Tray, Menu, session, desktopCapturer } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { saveWindow,getMainWindow } from './windowProxy'
-import { onLoginOrRegister, onLoginSuccess, onSendGeneralMessage, onSendPeerConnection, onShowJoinMeetingWindow, onGetWindow, onGetWindowManage, onWindowOperation, registerMeetingWindowHandlers, onShowChatRoom } from './ipc'
+import { saveWindow, getMainWindow } from './windowProxy'
+import { onLoginOrRegister, onLoginSuccess, onSendGeneralMessage, onSendPeerConnection, onShowJoinMeetingWindow, onGetWindow, onGetWindowManage, onWindowOperation, registerMeetingWindowHandlers, onShowChatRoom, onSendTunnelMessage } from './ipc'
 
 global.globalData = {
   memberList: []
@@ -25,11 +25,29 @@ function createWindow() {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      scrollBounce: false
+      scrollBounce: false,
+      webSecurity: false
     }
   })
+  // 或者通过快捷键控制
+  const template = [
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: 'F12',
+          click: () => {
+            mainWindow.webContents.toggleDevTools();
+          }
+        }
+      ]
+    }
+  ];
 
-  saveWindow("main",mainWindow)
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+  saveWindow("main", mainWindow)
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
@@ -57,14 +75,15 @@ onGetWindow()
 onGetWindowManage()
 onWindowOperation()
 onShowChatRoom()
+onSendTunnelMessage()
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
-    session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    desktopCapturer.getSources({ types: ['screen','window'] }).then((sources) => {
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
       // Grant access to the first screen found.
       callback({ video: sources[0], audio: 'loopback' })
     })
@@ -108,12 +127,12 @@ ipcMain.on('minimize-window', () => {
   }
 });
 // 新的最小化的代码
-ipcMain.on('window-minimize',(event)=>{
+ipcMain.on('window-minimize', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   win.minimize()
 })
 // 新的最大化的代码
-ipcMain.on('window-maximize',(event)=>{
+ipcMain.on('window-maximize', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (win.isMaximized()) {
     win.unmaximize()
@@ -122,7 +141,7 @@ ipcMain.on('window-maximize',(event)=>{
   }
 })
 // 新的关闭窗口的代码
-ipcMain.on('window-close',(event)=>{
+ipcMain.on('window-close', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   win.close()
 })
@@ -154,7 +173,7 @@ ipcMain.on('show-close-dialog', () => {
 function createTray() {
   // 如果托盘已存在，则不重复创建
   if (tray) return;
-  
+
   tray = new Tray(join(__dirname, '../../resources/icon.png'));
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -173,10 +192,10 @@ function createTray() {
       }
     }
   ]);
-  
+
   tray.setToolTip('EasyMeeting');
   tray.setContextMenu(contextMenu);
-  
+
   // 点击托盘图标显示窗口
   tray.on('click', () => {
     const mainWindow = getMainWindow();

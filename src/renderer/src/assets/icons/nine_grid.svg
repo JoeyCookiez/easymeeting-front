@@ -1,0 +1,15 @@
+<svg width="24" height="24" viewBox="0 0 24 24"
+     xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+  <!-- 单元格 5x5，间距 1.5px（取整到坐标），外边距 3px，圆角 rx=0.8 -->
+  <rect x="3"  y="3"  width="5" height="5" rx="0.8"/>
+  <rect x="9.5" y="3"  width="5" height="5" rx="0.8"/>
+  <rect x="16" y="3"  width="5" height="5" rx="0.8"/>
+
+  <rect x="3"  y="9.5" width="5" height="5" rx="0.8"/>
+  <rect x="9.5" y="9.5" width="5" height="5" rx="0.8"/>
+  <rect x="16" y="9.5" width="5" height="5" rx="0.8"/>
+
+  <rect x="3"  y="16" width="5" height="5" rx="0.8"/>
+  <rect x="9.5" y="16" width="5" height="5" rx="0.8"/>
+  <rect x="16" y="16" width="5" height="5" rx="0.8"/>
+</svg>

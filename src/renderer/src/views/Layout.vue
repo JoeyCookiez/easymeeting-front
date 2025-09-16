@@ -126,7 +126,7 @@ const isActive = (path) => route.path === path
     height: 100%;
     width: 100%;
     overflow: hidden;
-
+    border-radius: 4px;
     .sidebar {
         width: 66px;
         background-color: #f5f7fa;

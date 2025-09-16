@@ -137,7 +137,7 @@ import record_on from '../../assets/icons/record_on.svg'
 import exit_meeting_on from '../../assets/icons/exit_meeting.svg'
 import face_line from '../../assets/icons/face_line.svg'
 import layout_fill from '../../assets/icons/layout_on.svg'
-import { getMeetingInfo } from '../../utils/presist'
+import { getMeetingInfo, saveInMeeting } from '../../utils/presist'
 import CHatRoom from '../../components/CHatRoom.vue'
 const userStore = useUserInfoStore()
 const route = useRoute()
@@ -595,7 +595,7 @@ onMounted(async () => {
 		durationText.value = formatDuration(Date.now() - startAt)
 	}, 1000)
 	manageMediaTracks()
-
+	saveInMeeting(true)
 	const state = await window.shared.get()
 	// console.log('初始全局状态', state)
 	// const userInfo = userStore.getInfo()
@@ -640,7 +640,12 @@ onMounted(async () => {
 				break
 		}
 	})
-
+	await window.electronAPI.sendTunnelMessage({
+		winKey: "main",
+		data: {
+			inMeeting: true
+		}
+	})
 	window.electronAPI.onWsMessage(async (message) => {
 		// console.log('收到WebSocket消息:', message);
 
@@ -866,7 +871,8 @@ const toggleCamera = async () => {
 		type: MessageTypeEnum.MEETING_USER_VIDEO_CHANGE,
 		sendUserId: userInfo?.userId,
 		openVideo: cameraOn.value,
-		openMicro: microOn.value
+		openMicro: microOn.value,
+		time: '-'
 	}
 	sendGeneralMessage(payload)
 
@@ -1045,6 +1051,13 @@ const endMeeting = () => { window.api?.meetingWindowControl?.('close') }
 const controlWindow = async (action) => {
 	if (action === 'close') {
 		// 退出会议
+		saveInMeeting(false)
+		await window.electronAPI.sendTunnelMessage({
+			winKey: "main",
+			data: {
+				inMeeting: false
+			}
+		})
 		const res = await exitMeeting()
 		if (res.code != 200) {
 			ElMessage.error(res?.message)
@@ -1377,8 +1390,8 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	background-color: #616ed0;
 	align-items: center;
 	width: 1000px;
-	border-bottom-left-radius: 8px;
-	border-bottom-right-radius: 8px;
+	// border-bottom-left-radius: 8px;
+	// border-bottom-right-radius: 8px;
 
 	.comment-input-area {
 		display: flex;
@@ -1488,6 +1501,7 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	align-items: center;
 	justify-content: center;
 	padding: 8px 0px;
+	z-index: 1;
 	flex-direction: column;
 	position: absolute;
 	// bottom: 72px;

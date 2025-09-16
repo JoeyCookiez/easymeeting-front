@@ -5,12 +5,13 @@
                 <div class="features-grid">
                     <div class="feature-card" v-for="item in featureItems" :key="item.route"
                         @click="handleFeatureClick(item)">
-                        <div class="feature-card-panel" @mouseenter="changeImg(item?.route, item?.enterIcon)"
-                            @mouseleave="changeImg(item?.route, item?.exitIcon)">
-                            <div class="feature-card-icon">
-                                <img :src="item?.initIcon" :id="item?.route + '-img'" class="feature-card-img" />
+                        <div class="feature-card-panel" @mouseenter="changeImg(item?.route, item?.label === '加入会议' && isInMeeting ?item?.backEnterIcon :item?.enterIcon)"
+                            @mouseleave="changeImg(item?.route,item?.label === '加入会议' && isInMeeting ? item?.backExitIcon: item?.exitIcon)">
+                            <div :class="['feature-card-icon', item?.label === '加入会议' && isInMeeting ?'feature-card-icon-orange-background' :'feature-card-icon-blue-background']">
+                                <!-- <img v-if="item.route === '/quickMeeting' || item.route === '/screenShare'" :src=""/> -->
+                                <img :src="item?.label === '加入会议' && isInMeeting ? item?.backInitIcon : item?.initIcon" :id="item?.route + '-img'" class="feature-card-img" />
                             </div>
-                            <p>{{ item?.label }}</p>
+                            <p>{{ isInMeeting?item?.label_ :item?.label }}</p>
                         </div>
                         <!-- <div class="feature-title">{{ item.label }}</div> -->
                         <!-- <div class="feature-desc">{{ item.desc }}</div> -->
@@ -97,8 +98,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { joinMeeting, preJoinMeeting } from '../../api/meeting'
 import { ElMessage } from 'element-plus'
-import { getUserInfo, saveMeetingInfo } from '../../utils/presist'
+import { getInMeeting, getUserInfo, saveMeetingInfo } from '../../utils/presist'
 import join_normal_new from '../../assets/icons/main_view_join_normal_new.svg'
+import join_back_normal from '../../assets/icons/main_view_back_normal.svg'
 import quick_normal from '../../assets/icons/main_view_quick_normal.svg'
 import schedule_normal from '../../assets/icons/main_view_schedule_normal.svg'
 import share_normal from '../../assets/icons/main_view_share_normal.svg'
@@ -117,14 +119,19 @@ import share_hover_exit from '../../assets/apng/main_view_share_hover_exit_1.apn
 const featureItems = ref([
     {
         label: '加入会议',
+        label_: '返回会议',
         route: '/joinMeeting',
         desc: '通过会议号或链接加入',
         initIcon: join_normal_new,
+        backInitIcon: join_back_normal,
         enterIcon: join_hover_enter,
-        exitIcon: join_hover_exit
+        exitIcon: join_hover_exit,
+        backEnterIcon: back_hover_enter,
+        backExitIcon: back_hover_exit
     },
     {
         label: '快速会议',
+        label_: '加入会议',
         route: '/quickMeeting',
         desc: '立即发起一个会议',
         initIcon: quick_normal,
@@ -133,6 +140,7 @@ const featureItems = ref([
     },
     {
         label: '预定会议',
+        label_: '预定会议',
         route: '/scheduleMeeting',
         desc: '设定时间并邀请参会人',
         initIcon: schedule_normal,
@@ -141,6 +149,7 @@ const featureItems = ref([
     },
     {
         label: '共享屏幕',
+        label_: '共享屏幕',
         route: '/screenShare',
         desc: '快速共享当前屏幕',
         initIcon: share_normal,
@@ -149,7 +158,7 @@ const featureItems = ref([
     }
 ])
 const router = useRouter()
-
+const isInMeeting = ref(false)
 const showJoinDialog = ref(false)
 const joinForm = ref({
     meetingNo: '123456789',
@@ -159,6 +168,9 @@ const joinForm = ref({
     microOpen: false
 })
 const changeImg = (key, newIcon) => {
+    if(key === '/joinMeeting' && isInMeeting.value){
+
+    }
     const imgDom = document.getElementById(key + '-img')
     imgDom.src = newIcon
 }
@@ -238,9 +250,15 @@ const confirmJoinMeeting = async () => {
 const now = ref(new Date())
 onMounted(() => {
     // 可在此处接入真实会议数据
-    const userInfo = JSON.parse(localStorage.getItem("userInfo"))
+    const userInfo = getUserInfo()
     console.log("userInfo", userInfo)
     joinForm.value.nickName = userInfo?.nickName
+    const inMeeting =  getInMeeting()
+    console.log(inMeeting)
+    window.electronAPI.onTunnelMessage((data) => {
+        console.log("收到管道消息", data)
+        isInMeeting.value = data?.inMeeting
+    })
 })
 
 const month = computed(() => now.value.getMonth() + 1)
@@ -262,6 +280,7 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
     height: 100%;
     display: flex;
     flex-direction: column;
+
     .window-header {
         display: flex;
         justify-content: space-between;
@@ -326,6 +345,7 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
         align-items: center;
         justify-content: center;
         border-right: solid #e2e2e2 1px;
+        -webkit-app-region: drag;
 
         .features-grid {
             display: grid;
@@ -355,10 +375,7 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
                 width: 64px;
                 height: 64px;
                 // background-color: rgb(26, 125, 255);
-                background: linear-gradient(to right bottom,
-                        rgb(3, 113, 255) 0%,
-                        rgb(15, 119, 255) 50%,
-                        rgb(27, 125, 255) 100%);
+
                 border-radius: 14px;
                 transition: all 0.2s ease;
 
@@ -371,6 +388,20 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
                     transform: translateY(-2px);
                     box-shadow: 0 10px 10px rgba(0, 0, 0, 0.2);
                 }
+            }
+
+            .feature-card-icon-blue-background {
+                background: linear-gradient(to right bottom,
+                        rgb(3, 113, 255) 0%,
+                        rgb(15, 119, 255) 50%,
+                        rgb(27, 125, 255) 100%);
+            }
+            .feature-card-icon-orange-background{
+                background: linear-gradient(to right bottom,
+                        rgb(255,120,20) 0%,
+                        rgb(255,135,35) 50%,
+                        rgb(255,150,50) 100%
+                );
             }
         }
     }

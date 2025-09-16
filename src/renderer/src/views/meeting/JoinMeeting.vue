@@ -49,7 +49,7 @@ const formData = reactive({
     nickName: route.query.nickName,
     audioOn: '1',
     videoOpen: '0',
-    microOpen: '1'
+    microOpen: '0'
 })
 const handleJoinMeeting = async () => {
     try {
@@ -126,6 +126,7 @@ onMounted(() => {
     flex-direction: column;
     background-color: white;
     height: 100vh;
+    border-radius: 8px;
 }
 
 .main-content {

@@ -8,4 +8,7 @@
   --top-bar-height: 36px;
   --checkbox-size: 16px;
   --meeting-room-width: 1250px;
+  --chat-room-avatar-size: 36px;
+  --chat-room-func-icon-size: 30px;
+  --chat-room-func-btn-size: 34px;
 }
