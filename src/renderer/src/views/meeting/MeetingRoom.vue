@@ -71,7 +71,7 @@
 										1).toUpperCase() }}
 								</div>
 								<video v-if="member?.userId === userInfo?.userId && cameraOn" autoplay muted playsinline
-									ref="localVideo"></video>
+									:ref="setLocalVideo"></video>
 								<video v-else-if="member?.userId !== userInfo?.userId && member?.openVideo" autoplay
 									playsinline :ref="el => setVideoRef(el, member?.userId)"
 									@loadedmetadata="handleVideoLoaded($event, member?.userId)"></video>
@@ -249,7 +249,15 @@ const rightPanelSelect = ref(0) // 右侧面板显示什么 0表示显示聊天�
 const filteredMemberList = computed(() => {
 	return curMemberList.value.length > 1 ? curMemberList.value.filter(member => member.userId !== userInfo?.userId) : [];
 });
-
+const setLocalVideo = el=>{
+	localVideo.value = el
+}
+const attachLocal = () => {
+  if (localVideo.value && localStream.value) {
+    localVideo.value.srcObject = localStream.value
+    localVideo.value.onloadedmetadata = () => localVideo.value.play().catch(console.error)
+  }
+}
 const handleVideoLoaded = (event, userId) => {
 	const video = event.target
 	// 检查视频元素是否仍然存在于DOM中
@@ -279,7 +287,7 @@ const manageMediaTracks = async () => {
 
 			console.log(`🎥 获取媒体流，约束条件:`, constraints)
 			localStream.value = await navigator.mediaDevices.getUserMedia(constraints)
-
+			attachLocal()
 			// 如果本地dom节点存在则在本地显示
 			if (localVideo.value) {
 				localVideo.value.srcObject = localStream.value
@@ -958,7 +966,10 @@ const toggleCamera = async () => {
 
 	// 然后更新所有PeerConnection并触发重新协商
 	console.log(`🔄 开始更新所有PeerConnection，当前连接数: ${peerConnectionMap.size}`)
-	await updateAllPeerConnections()
+	// await updateAllPeerConnections()
+	if(allMembersList.value.length>1){
+		await updateAllPeerConnections()
+	}
 
 	// 更新tipbar状态
 	if (sharing.value) {
