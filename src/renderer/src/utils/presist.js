@@ -33,6 +33,15 @@ const saveInMeeting = (inMeeting)=>{
     localStorage.setItem("inMeeting",inMeeting)
     return
 }
+
+const getMeetingMessageList = ()=>{
+    return JSON.parse(localStorage.getItem("meetingMessageList")) || []
+}
+
+const saveMeetingMessageList = (data)=>{
+    localStorage.setItem("meetingMessageList",JSON.stringify(data))
+    return
+}
 export {
     getMeetingInfo,
     saveMeetingInfo,
@@ -41,5 +50,7 @@ export {
     getUserStatus,
     saveUserStatus,
     getInMeeting,
-    saveInMeeting
+    saveInMeeting,
+    getMeetingMessageList,
+    saveMeetingMessageList
 }

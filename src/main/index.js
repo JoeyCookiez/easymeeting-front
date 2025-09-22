@@ -30,23 +30,23 @@ function createWindow() {
     }
   })
   // 或者通过快捷键控制
-  const template = [
-    {
-      label: 'View',
-      submenu: [
-        {
-          label: 'Toggle Developer Tools',
-          accelerator: 'F12',
-          click: () => {
-            mainWindow.webContents.toggleDevTools();
-          }
-        }
-      ]
-    }
-  ];
+  // const template = [
+  //   {
+  //     label: 'View',
+  //     submenu: [
+  //       {
+  //         label: 'Toggle Developer Tools',
+  //         accelerator: 'F12',
+  //         click: () => {
+  //           mainWindow.webContents.toggleDevTools();
+  //         }
+  //       }
+  //     ]
+  //   }
+  // ];
 
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
+  // const menu = Menu.buildFromTemplate(template);
+  // Menu.setApplicationMenu(menu);
   saveWindow("main", mainWindow)
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()

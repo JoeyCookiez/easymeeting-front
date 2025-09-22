@@ -5,13 +5,16 @@
                 <div class="features-grid">
                     <div class="feature-card" v-for="item in featureItems" :key="item.route"
                         @click="handleFeatureClick(item)">
-                        <div class="feature-card-panel" @mouseenter="changeImg(item?.route, item?.label === '加入会议' && isInMeeting ?item?.backEnterIcon :item?.enterIcon)"
-                            @mouseleave="changeImg(item?.route,item?.label === '加入会议' && isInMeeting ? item?.backExitIcon: item?.exitIcon)">
-                            <div :class="['feature-card-icon', item?.label === '加入会议' && isInMeeting ?'feature-card-icon-orange-background' :'feature-card-icon-blue-background']">
+                        <div class="feature-card-panel"
+                            @mouseenter="changeImg(item?.route, item?.label === '加入会议' && isInMeeting ? item?.backEnterIcon : item?.enterIcon)"
+                            @mouseleave="changeImg(item?.route, item?.label === '加入会议' && isInMeeting ? item?.backExitIcon : item?.exitIcon)">
+                            <div
+                                :class="['feature-card-icon', item?.label === '加入会议' && isInMeeting ? 'feature-card-icon-orange-background' : 'feature-card-icon-blue-background']">
                                 <!-- <img v-if="item.route === '/quickMeeting' || item.route === '/screenShare'" :src=""/> -->
-                                <img :src="item?.label === '加入会议' && isInMeeting ? item?.backInitIcon : item?.initIcon" :id="item?.route + '-img'" class="feature-card-img" />
+                                <img :src="item?.label === '加入会议' && isInMeeting ? item?.backInitIcon : item?.initIcon"
+                                    :id="item?.route + '-img'" class="feature-card-img" />
                             </div>
-                            <p>{{ isInMeeting?item?.label_ :item?.label }}</p>
+                            <p>{{ isInMeeting ? item?.label_ : item?.label }}</p>
                         </div>
                         <!-- <div class="feature-title">{{ item.label }}</div> -->
                         <!-- <div class="feature-desc">{{ item.desc }}</div> -->
@@ -168,7 +171,7 @@ const joinForm = ref({
     microOpen: false
 })
 const changeImg = (key, newIcon) => {
-    if(key === '/joinMeeting' && isInMeeting.value){
+    if (key === '/joinMeeting' && isInMeeting.value) {
 
     }
     const imgDom = document.getElementById(key + '-img')
@@ -253,11 +256,16 @@ onMounted(() => {
     const userInfo = getUserInfo()
     console.log("userInfo", userInfo)
     joinForm.value.nickName = userInfo?.nickName
-    const inMeeting =  getInMeeting()
+    const inMeeting = getInMeeting()
     console.log(inMeeting)
     window.electronAPI.onTunnelMessage((data) => {
         console.log("收到管道消息", data)
         isInMeeting.value = data?.inMeeting
+    })
+
+    window.electron.ipcRenderer.on('save-meeting-message', (event, messageContent) => {
+        console.log('收到保存会议消息请求:', messageContent)
+        saveMeetingMessageList(messageContent)
     })
 })
 
@@ -396,12 +404,12 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
                         rgb(15, 119, 255) 50%,
                         rgb(27, 125, 255) 100%);
             }
-            .feature-card-icon-orange-background{
+
+            .feature-card-icon-orange-background {
                 background: linear-gradient(to right bottom,
-                        rgb(255,120,20) 0%,
-                        rgb(255,135,35) 50%,
-                        rgb(255,150,50) 100%
-                );
+                        rgb(255, 120, 20) 0%,
+                        rgb(255, 135, 35) 50%,
+                        rgb(255, 150, 50) 100%);
             }
         }
     }

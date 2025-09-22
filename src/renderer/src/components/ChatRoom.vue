@@ -53,7 +53,7 @@ import emoji_normal from '../assets/icons/interactive_emoji_normal.svg'
 import emoji_hover from '../assets/icons/interactive_emoji_hover.svg'
 import { emojiMap } from '../../../main/config';
 import { MessageTypeEnum } from '../enums/messageTypeEnum';
-import { getUserInfo } from '../utils/presist';
+import { getMeetingMessageList, getUserInfo } from '../utils/presist';
 import { getCurHourAndMinutes } from '../utils/all';
 
 const scrollRef = ref(null)
@@ -63,26 +63,7 @@ const message = ref('')
 const editorRef = ref(null)
 const emojiList = emojiMap
 const userInfo = getUserInfo()
-const messageList = ref([
-    {
-        "time": "11:09",
-        "index": '1',
-        "chatRecords": [
-            {
-                "content": "<img src=\"/src/assets/emoji/emoji_0.png\" style=\"width:30px;height:30px\">",
-                "sendUserId": "915445853510",
-                "sendUserName": "王皓",
-                "avatar": "http://localhost:8080/file/TimBoll.jpg"
-            },
-            {
-                "content": "<img src=\"/src/assets/emoji/give_like_6.png\" style=\"width:30px;height:30px\">",
-                "sendUserId": "915445853510",
-                "sendUserName": "王皓",
-                "avatar": "http://localhost:8080/file/TimBoll.jpg"
-            }
-        ]
-    }
-])
+const messageList = ref([])
 const insertNodeAtCursor = (node) => {
     const el = editorRef.value
     el && el.focus()
@@ -142,21 +123,24 @@ const changeImg = (imgSrc, type) => {
     }
     emojiRef.value.src = imgSrc
 }
-onMounted(() => {
+onMounted(async() => {
+    const state = await window.shared.get()
+    // console.log('初始全局状态', state)
+    messageList.value = state?.meetingMemberList
     window.electronAPI.onWsMessage((message) => {
         const msgJson = typeof message == 'object' ? message : JSON.parse(message)
         const { messageType, sendUserId, receiveUserId, messageContent } = msgJson
-        console.warn('message type:', messageType)
+        // console.warn('message type:', messageType)
         switch (messageType) {
             case MessageTypeEnum.CHAT_MEDIA_MESSAGE:
-                console.log(messageContent)
-                messageContent.sort((a,b)=>{
-                    const [ah,am] = a.time.split(':').map(Number)
-                    const [bh,bm] = b.time.split(':').map(Number)
-                    if(ah==bh){
-                        return am-bm
+                // console.log(messageContent)
+                messageContent.sort((a, b) => {
+                    const [ah, am] = a.time.split(':').map(Number)
+                    const [bh, bm] = b.time.split(':').map(Number)
+                    if (ah == bh) {
+                        return am - bm
                     }
-                    return ah-bh
+                    return ah - bh
                 })
                 messageList.value = messageContent
         }
@@ -180,16 +164,18 @@ onMounted(() => {
         flex-direction: column;
 
         .message-box {
-            .message-area{
+            .message-area {
                 display: flex;
                 flex-direction: column;
-                .message-time{
+
+                .message-time {
                     display: flex;
                     justify-content: center;
                     color: #000;
                     font-size: 15px;
                 }
             }
+
             // align-items: flex-end;
             .message-row {
                 display: flex;

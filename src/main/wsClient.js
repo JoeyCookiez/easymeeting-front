@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 import { getMainWindow, getWindow, getWindowMange } from "./windowProxy";
 import { updateSharedState } from "./sharedState";
+import { MessageTypeEnum } from "../renderer/src/enums/messageTypeEnum";
 
 let ws = null
 const maxRetries = 50
@@ -54,12 +55,27 @@ const connectWs = () => {
         }
         
         switch (messageType) {
-            case 1:
+            case MessageTypeEnum.ADD_MEETING_ROOM:
                 // 加入会议情况
                 const { meetingMemberList } = messageContent
                 updateSharedState({
                     memberList: meetingMemberList
                 })
+                break
+            case MessageTypeEnum.CHAT_MEDIA_MESSAGE:
+                console.log('收到媒体消息',data)
+                // 通过IPC发送到渲染进程处理localStorage保存
+                updateSharedState({
+                    meetingMemberList: messageContent
+                })
+                const windows = getWindowMange()
+                for (const key in windows) {
+                    try {
+                        windows[key]?.webContents?.send("save-meeting-message", messageContent)
+                    } catch (e) {
+                        console.log(`向窗口 ${key} 发送保存消息失败:`, e.message)
+                    }
+                }
                 break
             default:
                 break

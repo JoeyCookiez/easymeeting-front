@@ -42,25 +42,53 @@
 			<div class="left-panel">
 				<div class="content" @click="cancelExit">
 					<div class="video-area">
-						<div class="grid" :class="gridType">
-							<div class="video-card self"
-								:class="{ muted: isMuted || !micAvailable, cameraOff: !cameraOn }">
-								<div class="avatar" v-if="!cameraOn">{{ avatarInitial }}</div>
-								<video v-else autoplay muted playsinline ref="localVideo"></video>
-								<div class="name-tag">{{ nickName || '我' }}</div>
-							</div>
-							<div class="video-card" v-for="member in filteredMemberList">
-								<div class="avatar" v-if="!member?.openVideo">{{ member?.nickName?.slice(0,
-									1).toUpperCase()
-									}}
-								</div>
-								<video v-show="member?.openVideo" autoplay playsinline
-									:ref="el => setVideoRef(el, member?.userId)"
-									@loadedmetadata="handleVideoLoaded($event, member?.userId)"></video>
-								<div class="name-tag">{{ member?.nickName }}</div>
-							</div>
+						<!-- 左侧切换按钮 -->
+						<button v-if="totalPages > 1 && currentPage > 1" class="pagination-btn pagination-btn-left"
+							@click="goToPreviousPage" title="上一页">
+							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+								<path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+							</svg>
+						</button>
 
+						<!-- 右侧切换按钮 -->
+						<button v-if="totalPages > 1 && currentPage < totalPages"
+							class="pagination-btn pagination-btn-right" @click="goToNextPage" title="下一页">
+							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+								<path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+							</svg>
+						</button>
+
+						<div class="grid" :class="gridType">
+							<div class="video-card" v-for="(member, index) in currentPageMembers"
+								:key="member?.userId || 'self'" :class="{
+									self: member?.userId === userInfo?.userId,
+									muted: member?.userId === userInfo?.userId && (isMuted || !micAvailable),
+									cameraOff: member?.userId === userInfo?.userId && !cameraOn
+								}">
+								<div class="avatar"
+									v-if="member?.userId === userInfo?.userId ? !cameraOn : !member?.openVideo">
+									{{ member?.userId === userInfo?.userId ? avatarInitial : member?.nickName?.slice(0,
+										1).toUpperCase() }}
+								</div>
+								<video v-if="member?.userId === userInfo?.userId && cameraOn" autoplay muted playsinline
+									ref="localVideo"></video>
+								<video v-else-if="member?.userId !== userInfo?.userId && member?.openVideo" autoplay
+									playsinline :ref="el => setVideoRef(el, member?.userId)"
+									@loadedmetadata="handleVideoLoaded($event, member?.userId)"></video>
+								<div class="name-tag">
+									{{ member?.userId === userInfo?.userId ? (nickName || '我') : member?.nickName }}
+								</div>
+							</div>
 						</div>
+					</div>
+				</div>
+
+				<!-- 分页指示器 -->
+				<div v-if="totalPages > 1" class="pagination-indicator">
+					<div class="pagination-dots">
+						<span v-for="page in totalPages" :key="page" class="pagination-dot"
+							:class="{ active: page === currentPage }" @click="goToPage(page)">
+						</span>
 					</div>
 				</div>
 
@@ -82,7 +110,7 @@
 						<IconWithTitle :svgSrc="screen_share" title="共享屏幕" :iconSize="24" @click="shareScreen">
 						</IconWithTitle>
 						<IconWithTitle :svgSrc="invite_on" title="邀请" :iconSize="24" @click="invite"></IconWithTitle>
-						<IconWithTitle :svgSrc="member_on" title="成员" :iconSize="24" @click="toggleMembers">
+						<IconWithTitle :svgSrc="member_on" :title="`成员(${allMembersList.length})`" :iconSize="24" @click="toggleMembers">
 						</IconWithTitle>
 						<IconWithTitle :svgSrc="chat_on" title="聊天" @click="toggleChat"></IconWithTitle>
 						<IconWithTitle :svgSrc="recording ? record_on : record_off" :title="recording ? '停止录制' : '录制'"
@@ -106,7 +134,8 @@
 				</div>
 			</div>
 			<div class="right-panel">
-				<CHatRoom />
+				<CHatRoom v-if="rightPanelSelect === 0" />
+				<MemberList :memberList="allMembersList" v-if="rightPanelSelect === 1" />
 			</div>
 		</div>
 		<!-- 屏幕共享选择弹窗 -->
@@ -137,8 +166,9 @@ import record_on from '../../assets/icons/record_on.svg'
 import exit_meeting_on from '../../assets/icons/exit_meeting.svg'
 import face_line from '../../assets/icons/face_line.svg'
 import layout_fill from '../../assets/icons/layout_on.svg'
-import { getMeetingInfo, saveInMeeting } from '../../utils/presist'
+import { getMeetingInfo, saveInMeeting, saveMeetingMessageList } from '../../utils/presist'
 import CHatRoom from '../../components/CHatRoom.vue'
+import MemberList from '../../components/MemberList.vue'
 const userStore = useUserInfoStore()
 const route = useRoute()
 const router = useRouter()
@@ -159,6 +189,21 @@ const isPop = ref(false)
 const gridType = ref('four')
 const showScreenShareDialog = ref(false)
 const userInfo = JSON.parse(localStorage.getItem("userInfo")) || {}
+
+// 分页相关变量
+const currentPage = ref(1)
+const pageSize = computed(() => gridType.value === 'four' ? 4 : 9)
+const totalPages = computed(() => {
+	const totalMembers = filteredMemberList.value.length + 1 // +1 包含自己
+	return Math.min(Math.ceil(totalMembers / pageSize.value), 3) // 最多显示3页
+})
+const allMembersList = computed(()=>[{ ...userInfo, userId: userInfo?.userId }, ...filteredMemberList.value])
+const currentPageMembers = computed(() => {
+	const startIndex = (currentPage.value - 1) * pageSize.value
+	const endIndex = startIndex + pageSize.value
+	const allMembers = [{ ...userInfo, userId: userInfo?.userId }, ...filteredMemberList.value] // 包含自己
+	return allMembers.slice(startIndex, endIndex)
+})
 // 会议时长
 const startAt = Date.now()
 const durationText = ref('00:00:00')
@@ -199,10 +244,12 @@ const setVideoRef = (el, userId) => {
 }
 const isExitTop = ref(false) // 是否是上方弹窗
 const isExitBottom = ref(false) // 是否是下方弹窗
+const rightPanelSelect = ref(0) // 右侧面板显示什么 0表示显示聊天室 1表示显示成员列表
 // 在 script 部分
 const filteredMemberList = computed(() => {
 	return curMemberList.value.length > 1 ? curMemberList.value.filter(member => member.userId !== userInfo?.userId) : [];
 });
+
 const handleVideoLoaded = (event, userId) => {
 	const video = event.target
 	// 检查视频元素是否仍然存在于DOM中
@@ -523,6 +570,27 @@ const cancelExit = () => {
 const changeLayout = (type) => {
 	gridType.value = type
 	isPop.value = false
+	// 切换布局时重置到第一页
+	currentPage.value = 1
+}
+
+// 分页切换函数
+const goToPage = (page) => {
+	if (page >= 1 && page <= totalPages.value) {
+		currentPage.value = page
+	}
+}
+
+const goToPreviousPage = () => {
+	if (currentPage.value > 1) {
+		currentPage.value--
+	}
+}
+
+const goToNextPage = () => {
+	if (currentPage.value < totalPages.value) {
+		currentPage.value++
+	}
 }
 const createGroupPeerConnection = async (memberList) => {
 	for (const member of memberList) {
@@ -646,6 +714,12 @@ onMounted(async () => {
 			inMeeting: true
 		}
 	})
+	// 监听保存会议消息的IPC事件
+	window.electron.ipcRenderer.on('save-meeting-message', (event, messageContent) => {
+		console.log('收到保存会议消息请求:', messageContent)
+		saveMeetingMessageList(messageContent)
+	})
+
 	window.electronAPI.onWsMessage(async (message) => {
 		// console.log('收到WebSocket消息:', message);
 
@@ -838,6 +912,9 @@ onBeforeUnmount(() => {
 	// 清理tipbar监听器
 	window.electron.ipcRenderer.removeAllListeners('tipbar-action')
 
+	// 清理保存会议消息监听器
+	window.electron.ipcRenderer.removeAllListeners('save-meeting-message')
+
 	// 关闭tipbar窗口
 	window.api.closeScreenShareTipbar()
 })
@@ -903,6 +980,13 @@ watch(() => filteredMemberList.value, async () => {
 		}
 	})
 }, { deep: true })
+
+// 监听成员数量变化，自动调整当前页
+watch(() => totalPages.value, (newTotalPages) => {
+	if (currentPage.value > newTotalPages && newTotalPages > 0) {
+		currentPage.value = newTotalPages
+	}
+})
 const shareScreen = () => {
 	if (sharing.value) {
 		// 停止屏幕共享
@@ -1031,9 +1115,15 @@ const startScreenShare = async (source) => {
 }
 
 const invite = () => { ElMessage.info('邀请功能开发中') }
-const toggleMembers = () => { ElMessage.info('成员列表开发中') }
+const toggleMembers = async() => {
+	// ElMessage.info('成员列表开发中') 
+	rightPanelSelect.value = 1
+	isShowChat.value = !isShowChat.value
+	await window.electronAPI.showChatRoom({ show: isShowChat.value })
+}
 const toggleChat = async () => {
 	// ElMessage.info('聊天面板开发中')
+	rightPanelSelect.value = 0
 	isShowChat.value = !isShowChat.value
 	await window.electronAPI.showChatRoom({ show: isShowChat.value })
 }
@@ -1299,6 +1389,7 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 	border-radius: 10px;
 	padding: 10px;
 	height: 100%;
+	position: relative;
 
 	.grid {
 		display: grid;
@@ -1311,6 +1402,77 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 
 		&.nine {
 			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+	}
+}
+
+// 分页按钮样式
+.pagination-btn {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 40px;
+	height: 40px;
+	background: rgba(0, 0, 0, 0.6);
+	border: none;
+	border-radius: 50%;
+	color: white;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 10;
+	transition: all 0.3s ease;
+
+	&:hover {
+		background: rgba(0, 0, 0, 0.8);
+		transform: translateY(-50%) scale(1.1);
+	}
+
+	&.pagination-btn-left {
+		left: 10px;
+	}
+
+	&.pagination-btn-right {
+		right: 10px;
+	}
+
+	svg {
+		width: 20px;
+		height: 20px;
+	}
+}
+
+// 分页指示器样式
+.pagination-indicator {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding: 10px 0;
+	background: rgba(0, 0, 0, 0.1);
+
+	.pagination-dots {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+
+		.pagination-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			background: rgba(255, 255, 255, 0.4);
+			cursor: pointer;
+			transition: all 0.3s ease;
+
+			&:hover {
+				background: rgba(255, 255, 255, 0.6);
+				transform: scale(1.2);
+			}
+
+			&.active {
+				background: #616ed0;
+				transform: scale(1.3);
+			}
 		}
 	}
 }
@@ -1367,20 +1529,24 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 		background: #000;
 	}
 }
-.mid-container{
+
+.mid-container {
 	display: flex;
 }
-.left-panel{
+
+.left-panel {
 	display: flex;
 	flex-direction: column;
 	height: calc(100vh - 50px);
 }
-.right-panel{
+
+.right-panel {
 	display: flex;
 	flex-direction: column;
 	flex: 1;
 	border-left: 2px solid #afafaf;
 }
+
 .bottom-bar {
 	display: flex;
 	justify-content: space-between;
