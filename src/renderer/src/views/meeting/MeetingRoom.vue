@@ -15,11 +15,11 @@
 				</div>
 				<div v-if="isPop" class="bubble">
 					<div @click="changeLayout('four')">
-						<img src="../../assets/icons/fourGrid.png"></img>
+						<img src="../../assets/icons/four_grid.svg"></img>
 						<p>四宫格</p>
 					</div>
 					<div @click="changeLayout('nine')">
-						<img src="../../assets/icons/nineGrid.png"></img>
+						<img src="../../assets/icons/nine_grid.svg"></img>
 						<p>九宫格</p>
 					</div>
 				</div>
@@ -40,7 +40,8 @@
 		<!-- 主体：视频网格 -->
 		<div class="mid-container">
 			<div class="left-panel">
-				<div class="content" @click="cancelExit">
+				<div class="content" @click="cancelExit" :ref="setContentRef">
+					<div v-if="recording" class="recording-timer">{{ recordTimerText }}</div>
 					<div class="video-area">
 						<!-- 左侧切换按钮 -->
 						<button v-if="totalPages > 1 && currentPage > 1" class="pagination-btn pagination-btn-left"
@@ -185,6 +186,16 @@ const cameraOn = ref(route.query.video === '1')
 const microOn = ref(route.query.micro === '1')
 const localVideo = ref(null)
 const recording = ref(false)
+const recordTimerText = ref('00:00')
+let recordTimer = null
+const contentRef = ref(null)
+const setContentRef = (el)=>{ contentRef.value = el }
+let mediaRecorder = null
+let recordedChunks = []
+let mixAudioStream = null
+let composedStream = null
+let audioContext = null
+let destinationNode = null
 const isPop = ref(false)
 const gridType = ref('four')
 const showScreenShareDialog = ref(false)
@@ -888,6 +899,7 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
 	if (timer) clearInterval(timer)
+	if (recordTimer) clearInterval(recordTimer)
 
 	// 停止所有媒体轨道
 	if (localStream.value) {
@@ -977,6 +989,185 @@ const toggleCamera = async () => {
 			cameraOn: cameraOn.value
 		})
 	}
+}
+
+// 录制：收集视频与混音后的音频
+const buildMixedAudioStream = () => {
+	if (audioContext) {
+		try { audioContext.close() } catch {}
+	}
+	audioContext = new (window.AudioContext || window.webkitAudioContext)()
+	destinationNode = audioContext.createMediaStreamDestination()
+
+	// 本地音频
+	if (localStream.value) {
+		const localAudioTracks = localStream.value.getAudioTracks()
+		if (localAudioTracks.length) {
+			const localSource = audioContext.createMediaStreamSource(new MediaStream([localAudioTracks[0]]))
+			localSource.connect(destinationNode)
+		}
+	}
+	// 远端音频：从每个 video 元素的 srcObject 中提取音轨
+	Object.values(videoRefs.value).forEach((video)=>{
+		if (!video || !video.srcObject) return
+		const s = video.srcObject
+		const tracks = s.getAudioTracks()
+		if (tracks && tracks.length) {
+			const source = audioContext.createMediaStreamSource(new MediaStream([tracks[0]]))
+			source.connect(destinationNode)
+		}
+	})
+
+	mixAudioStream = destinationNode.stream
+	return mixAudioStream
+}
+
+const captureContentVideo = async () => {
+    const container = contentRef.value
+    if (!container) throw new Error('未找到内容区域')
+
+    // 方案A：如果浏览器支持 Region Capture，对窗口媒体进行裁剪
+    try {
+        if (navigator.mediaDevices.getDisplayMedia) {
+            const disp = await navigator.mediaDevices.getDisplayMedia({
+                video: { frameRate: 30 },
+                audio: false
+            })
+            const track = disp.getVideoTracks()[0]
+            if (track && window.CropTarget && typeof track.cropTo === 'function') {
+                const target = await window.CropTarget.fromElement(container)
+                await track.cropTo(target)
+                return new MediaStream([track])
+            } else {
+                // 不支持裁剪则停止该轨并继续使用方案B
+                track && track.stop()
+            }
+        }
+    } catch (e) {
+        console.warn('Region Capture 不可用，回退到 canvas 合成方案', e)
+    }
+
+    // 方案B：将 content 中的所有 <video> 元素合成绘制到 canvas
+    const canvas = document.createElement('canvas')
+    const rect = container.getBoundingClientRect()
+    const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1))
+    canvas.width = Math.max(640, Math.floor(rect.width * dpr))
+    canvas.height = Math.max(360, Math.floor(rect.height * dpr))
+    const ctx = canvas.getContext('2d')
+
+    const draw = () => {
+        try {
+            ctx.clearRect(0,0,canvas.width,canvas.height)
+            // 背景色与 content 一致
+            ctx.fillStyle = '#dde5f4'
+            ctx.fillRect(0,0,canvas.width,canvas.height)
+
+            const videos = container.querySelectorAll('video')
+            const scaleX = canvas.width / rect.width
+            const scaleY = canvas.height / rect.height
+
+            videos.forEach((videoEl) => {
+                try {
+                    const vrect = videoEl.getBoundingClientRect()
+                    const x = (vrect.left - rect.left) * scaleX
+                    const y = (vrect.top - rect.top) * scaleY
+                    const w = vrect.width * scaleX
+                    const h = vrect.height * scaleY
+                    if (videoEl.readyState >= 2 && w > 0 && h > 0) {
+                        ctx.drawImage(videoEl, Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h))
+                    }
+                } catch {}
+            })
+
+            // 可选：在录制画面上叠加计时文本
+            if (recording.value) {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)'
+                const tw = 90 * dpr
+                const th = 32 * dpr
+                const cx = canvas.width / 2 - tw / 2
+                const cy = canvas.height / 2 - th / 2
+                ctx.fillRect(cx, cy, tw, th)
+                ctx.fillStyle = '#fff'
+                ctx.font = `${16 * dpr}px sans-serif`
+                ctx.textAlign = 'center'
+                ctx.textBaseline = 'middle'
+                ctx.fillText(recordTimerText.value, canvas.width / 2, canvas.height / 2)
+            }
+        } catch {}
+        if (recording.value) requestAnimationFrame(draw)
+    }
+    requestAnimationFrame(draw)
+    return canvas.captureStream(30)
+}
+
+const startRecording = async () => {
+    if (recording.value) return
+    recording.value = true
+    // 视频
+    const videoStream = await captureContentVideo()
+	// 音频
+	const mixed = buildMixedAudioStream()
+	// 合并
+	composedStream = new MediaStream()
+	videoStream.getVideoTracks().forEach(t=> composedStream.addTrack(t))
+	mixed.getAudioTracks().forEach(t=> composedStream.addTrack(t))
+
+	recordedChunks = []
+	const mimeCandidates = [
+		'video/mp4;codecs=avc1,mp4a',
+		'video/webm;codecs=vp9,opus',
+		'video/webm;codecs=vp8,opus',
+		'video/webm'
+	]
+	let selectedMime = ''
+	for (const m of mimeCandidates) {
+		if (MediaRecorder.isTypeSupported(m)) { selectedMime = m; break }
+	}
+	mediaRecorder = new MediaRecorder(composedStream, selectedMime ? { mimeType: selectedMime, videoBitsPerSecond: 4_000_000 } : undefined)
+	mediaRecorder.ondataavailable = (e)=>{ if (e.data && e.data.size > 0) recordedChunks.push(e.data) }
+	mediaRecorder.onstop = async ()=>{
+		try {
+			const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || selectedMime || 'video/webm' })
+			const arrayBuffer = await blob.arrayBuffer()
+			const preferMp4 = (mediaRecorder.mimeType || selectedMime || '').includes('mp4')
+			const ext = preferMp4 ? 'mp4' : ((mediaRecorder.mimeType || selectedMime || '').includes('webm') ? 'webm' : 'webm')
+			await window.api.saveRecordingBuffer({ buffer: arrayBuffer, defaultFileName: `meeting-${meetingNo.value}-${Date.now()}`, extension: ext })
+			ElMessage.success('录制已保存')
+		} catch (e) {
+			console.error('保存录制失败', e)
+			ElMessage.error('保存录制失败: ' + e.message)
+		}
+		// 清理
+		videoStream.getTracks().forEach(t=>t.stop())
+		if (mixAudioStream) mixAudioStream.getTracks().forEach(t=>t.stop())
+		if (audioContext) try { audioContext.close() } catch {}
+		mediaRecorder = null
+	}
+    mediaRecorder.start(1000)
+	startRecordTimer()
+	if (sharing.value) {
+		window.api.updateTipbarState({ recording: recording.value })
+	}
+}
+
+const stopRecording = async () => {
+	if (!recording.value) return
+	recording.value = false
+	if (recordTimer) { clearInterval(recordTimer); recordTimer = null; recordTimerText.value = '00:00' }
+	if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop()
+	if (sharing.value) {
+		window.api.updateTipbarState({ recording: recording.value })
+	}
+}
+
+const startRecordTimer = () => {
+	let seconds = 0
+	const fmt = (n)=> String(n).padStart(2,'0')
+	recordTimerText.value = '00:00'
+	recordTimer = setInterval(()=>{
+		seconds += 1
+		recordTimerText.value = `${fmt(Math.floor(seconds/60))}:${fmt(seconds%60)}`
+	}, 1000)
 }
 
 
@@ -1139,12 +1330,15 @@ const toggleChat = async () => {
 	await window.electronAPI.showChatRoom({ show: isShowChat.value })
 }
 const toggleRecord = () => {
-	recording.value = !recording.value
-
-	// 更新tipbar状态
-	if (sharing.value) {
-		window.api.updateTipbarState({
-			recording: recording.value
+	if (!recording.value) {
+		startRecording().catch(err=>{
+			console.error('开始录制失败:', err)
+			ElMessage.error('开始录制失败: ' + err.message)
+		})
+	} else {
+		stopRecording().catch(err=>{
+			console.error('停止录制失败:', err)
+			ElMessage.error('停止录制失败: ' + err.message)
 		})
 	}
 }
@@ -1415,6 +1609,20 @@ const openSettings = () => { ElMessage.info('设置面板开发中') }
 			grid-template-columns: repeat(3, minmax(0, 1fr));
 		}
 	}
+}
+
+.recording-timer {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	background: rgba(0,0,0,0.6);
+	color: #fff;
+	padding: 6px 10px;
+	border-radius: 6px;
+	z-index: 20;
+	font-weight: 700;
+	letter-spacing: 1px;
 }
 
 // 分页按钮样式

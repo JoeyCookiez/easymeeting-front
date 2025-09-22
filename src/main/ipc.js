@@ -1,4 +1,6 @@
 import { ipcMain, BrowserWindow, screen, session, desktopCapturer } from "electron"
+import { dialog } from 'electron'
+import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { getWindow, saveWindow, delWindow, getWindowMange } from "./windowProxy"
@@ -499,6 +501,29 @@ export function registerMeetingWindowHandlers() {
             })
         } catch (error) {
             console.error('转发 tipbar-action 失败:', error)
+        }
+    })
+
+    // 保存录制的二进制缓冲区为文件（webm 或 mp4）
+    ipcMain.handle('saveRecordingBuffer', async (event, payload) => {
+        try {
+            const { buffer, defaultFileName, extension } = payload || {}
+            const bw = BrowserWindow.fromWebContents(event.sender)
+            const { canceled, filePath } = await dialog.showSaveDialog(bw, {
+                title: '保存录制文件',
+                defaultPath: `${defaultFileName || 'meeting-record'}.${extension || 'webm'}`,
+                filters: [
+                    { name: 'MP4', extensions: ['mp4'] },
+                    { name: 'WebM', extensions: ['webm'] },
+                    { name: 'All Files', extensions: ['*'] }
+                ]
+            })
+            if (canceled || !filePath) return { success: false, canceled: true }
+            await writeFile(filePath, Buffer.from(buffer))
+            return { success: true, filePath }
+        } catch (error) {
+            console.error('保存录制文件失败:', error)
+            return { success: false, error: error.message }
         }
     })
 }

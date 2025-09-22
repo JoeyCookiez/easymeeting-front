@@ -11,7 +11,9 @@ const api = {
   getScreenSources: () => ipcRenderer.invoke('getScreenSources'),
   setScreenShareSource: (sourceId) => ipcRenderer.invoke('setScreenShareSource', sourceId),
   hideMeetingWindow: () => ipcRenderer.invoke('hideMeetingWindow'),
-  showMeetingWindow: () => ipcRenderer.invoke('showMeetingWindow')
+  showMeetingWindow: () => ipcRenderer.invoke('showMeetingWindow'),
+  // 保存录制文件（WebM 或 MP4），data: { buffer: ArrayBuffer, defaultFileName: string, extension: string }
+  saveRecordingBuffer: (data) => ipcRenderer.invoke('saveRecordingBuffer', data)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
