@@ -4,12 +4,14 @@
             <div class="left-panel">
                 <div class="features-grid">
                     <div class="feature-card" v-for="item in featureItems" :key="item.route"
-                        @click="handleFeatureClick(item)">
+                        @click="handleFeatureClick(item,$event)">
                         <div class="feature-card-panel"
-                            @mouseenter="changeImg(item?.route, item?.label === '加入会议' && isInMeeting ? item?.backEnterIcon : item?.enterIcon)"
-                            @mouseleave="changeImg(item?.route, item?.label === '加入会议' && isInMeeting ? item?.backExitIcon : item?.exitIcon)">
+                            @mouseenter="changeImg(item?.route, item?.label === '加入会议' && isInMeeting ? item?.backEnterIcon : item?.enterIcon,$event)"
+                            @mouseleave="changeImg(item?.route, item?.label === '加入会议' && isInMeeting ? item?.backExitIcon : item?.exitIcon,$event)">
                             <div
-                                :class="['feature-card-icon', item?.label === '加入会议' && isInMeeting ? 'feature-card-icon-orange-background' : 'feature-card-icon-blue-background']">
+                                :id="item?.route+'-icon'"
+                                :class="['feature-card-icon', item?.label === '加入会议' && isInMeeting ? 'feature-card-icon-orange-background' : 'feature-card-icon-blue-background']"
+                                :style="getFeatureBackground(item?.route)">
                                 <!-- <img v-if="item.route === '/quickMeeting' || item.route === '/screenShare'" :src=""/> -->
                                 <img :src="item?.label === '加入会议' && isInMeeting ? item?.backInitIcon : item?.initIcon"
                                     :id="item?.route + '-img'" class="feature-card-img" />
@@ -97,7 +99,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted,watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { joinMeeting, preJoinMeeting } from '../../api/meeting'
 import { ElMessage } from 'element-plus'
@@ -170,19 +172,43 @@ const joinForm = ref({
     password: '',
     microOpen: false
 })
-const changeImg = (key, newIcon) => {
-    if (key === '/joinMeeting' && isInMeeting.value) {
-
+const changeImg = (key, newIcon ,e) => {
+    // 如果是这两个则直接禁止冒泡
+    if ((key === '/quickMeeting'|| key === '/screenShare') && isInMeeting.value) {
+        const iconDom = document.getElementById(key+'-icon')
+        iconDom.classList.add('disabled')
+        e?.preventDefault()
+        e?.stopPropagation()
+        return
     }
     const imgDom = document.getElementById(key + '-img')
     imgDom.src = newIcon
 }
-const handleFeatureClick = async (item) => {
-    if (item.route === '/joinMeeting') {
+const getFeatureBackground = (route) => {
+    const notInMeetingBackgroundColor = 'linear-gradient(to right bottom, rgb(3, 113, 255) 0%, rgb(15, 119, 255) 50%, rgb(27, 125, 255) 100%)'
+    const inMeetingBackgroundColor = 'rgb(132,185,255)'
+    if (route === '/quickMeeting' || route === '/screenShare') {
+        return {
+            background: isInMeeting.value ? inMeetingBackgroundColor : notInMeetingBackgroundColor
+        }
+    }
+    return {}
+}
+const handleFeatureClick = async (item, e) => {
+    if (!isInMeeting.value && item.route === '/joinMeeting') {
         // 始终由主进程负责创建/复用窗口
         await window.electron.ipcRenderer.invoke("onShowJoinMeetingWindow", {
             nickName: getUserInfo()?.nickName
         })
+        return
+    }
+    if(isInMeeting.value && item.route === '/joinMeeting'){
+        // 返回会议窗口
+    }
+    // 如果在会议中那么快速会议和屏幕共享功能直接禁用
+    if(isInMeeting.value && (item.route === '/screenShare' || item.route === '/quickMeeting')){
+        e?.preventDefault()
+        e?.stopPropagation()
         return
     }
     router.push(item.route)
@@ -249,15 +275,36 @@ const confirmJoinMeeting = async () => {
 }
 
 
-
+watch(()=>isInMeeting.value,async()=>{
+    console.log("监听是否进入会议的状态", isInMeeting.value)
+    const quickMeetingIconDom = document.getElementById("/quickMeeting-icon")
+    console.log("dom",quickMeetingIconDom)
+    const screenShareIconDom = document.getElementById("/screenShare-icon")
+    const notInMeetingBackgroundColor = "linear-gradient(to right bottom, rgb(3, 113, 255) 0%, rgb(15, 119, 255) 50%, rgb(27, 125, 255) 100%)"
+    const inMeetingBackgroundColor = "linear-gradient(to right bottom, rgb(130,184,255) 0%, rgb(36 ,187, 255) 50%, rgb(142,190, 255) 100%)"
+    if (quickMeetingIconDom) {
+        quickMeetingIconDom.style.setProperty('background', isInMeeting.value ? inMeetingBackgroundColor : notInMeetingBackgroundColor, 'important')
+        if (!isInMeeting.value) {
+            quickMeetingIconDom.classList.remove('disabled')
+        }
+    }
+    if (screenShareIconDom) {
+        screenShareIconDom.style.setProperty('background', isInMeeting.value ? inMeetingBackgroundColor : notInMeetingBackgroundColor, 'important')
+        if (!isInMeeting.value) {
+            screenShareIconDom.classList.remove('disabled')
+        }
+    }
+    await nextTick()
+})
 const now = ref(new Date())
 onMounted(() => {
     // 可在此处接入真实会议数据
     const userInfo = getUserInfo()
     console.log("userInfo", userInfo)
     joinForm.value.nickName = userInfo?.nickName
-    const inMeeting = getInMeeting()
-    console.log(inMeeting)
+    // const inMeeting = getInMeeting()
+    // console.log(inMeeting)
+    isInMeeting.value = getInMeeting()
     window.electronAPI.onTunnelMessage((data) => {
         console.log("收到管道消息", data)
         isInMeeting.value = data?.inMeeting
@@ -392,7 +439,7 @@ const upcomingMeetings = computed(() => meetingList.value.filter(m => m.status !
                     height: 46px;
                 }
 
-                &:hover {
+                &:not(.disabled):hover {
                     transform: translateY(-2px);
                     box-shadow: 0 10px 10px rgba(0, 0, 0, 0.2);
                 }

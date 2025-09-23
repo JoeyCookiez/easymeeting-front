@@ -21,3 +21,10 @@ export function exitMeeting(data){
         method: "post"
     })
 }
+
+export function quickMeeting(){
+    return request({
+        url: "/meetingInof/quickMeeting",
+        method: "post"
+    })
+}
