@@ -16,3 +16,10 @@ export function register(data) {
         method: "post"
     })
 }
+
+export function logout(){
+    return request({
+        url: '/userInfo/logout',
+        method: "get"
+    })
+}

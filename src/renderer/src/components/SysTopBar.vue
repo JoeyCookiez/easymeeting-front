@@ -7,7 +7,7 @@
             <img :src="isClickMax ? sys_restore : sys_max" />
         </div>
         <div v-if="isClose" class="sys-btn" @mouseenter="changeImg(sys_close_hover)" @mouseleave="changeImg(sys_close)"
-            @click="handleSysOperation('close')">
+            @click="onCloseClick">
             <img :src="sys_close" ref="closeRef" />
         </div>
     </div>
@@ -27,7 +27,8 @@ const props = defineProps({
     isMin: { type: Boolean, default: true },
     isMax: { type: Boolean, default: true },
     isClose: { type: Boolean, default: true },
-    borderRadius: { type: Number, default: 8 }
+    borderRadius: { type: Number, default: 8 },
+    closeClick: { type: Function }
 })
 const handleSysOperation = (type) => {
     switch (type) {
@@ -45,6 +46,14 @@ const handleSysOperation = (type) => {
 }
 const changeImg = (imgSrc) => {
     closeRef.value.src = imgSrc
+}
+
+const onCloseClick = () => {
+    if (typeof props.closeClick === 'function') {
+        props.closeClick()
+    } else {
+        handleSysOperation('close')
+    }
 }
 </script>
 

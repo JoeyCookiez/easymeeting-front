@@ -23,7 +23,7 @@
         </div>
         <div class="main-content">
             <!-- <TitleBar /> -->
-            <SysTopBar></SysTopBar>
+            <SysTopBar :closeClick="handleCloseMainWindow"></SysTopBar>
             <div class="content-body">
                 <router-view />
             </div>
@@ -54,6 +54,7 @@ import setting_hover from '../assets/icons/home_navigation_bar_setting_hover.svg
 import setting_normal from '../assets/icons/home_navigation_bar_setting_normal.svg'
 import TopBar from '../components/TopBar.vue'
 import SysTopBar from '../components/SysTopBar.vue'
+import { logout } from '../api/user'
 const userStore = useUserInfoStore()
 const router = useRouter()
 const route = useRoute()
@@ -101,6 +102,11 @@ const handleBtnClick = (index, imgSrc, path) => {
     curSelectIndex.value = index
     imgRefs.value[index].src = imgSrc
     go(path)
+}
+const handleCloseMainWindow = async()=>{
+    console.log("重载系统关闭按钮的监听事件")
+    const res = await logout()
+    await window.electronAPI.close()
 }
 // const circleUrl = userStore.getInfo()?.avatar
 const circleUrl = ref("https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png")
