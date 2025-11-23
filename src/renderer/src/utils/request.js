@@ -3,10 +3,12 @@ import { ElLoading, ElMessage } from "element-plus";
 import { useUserInfoStore } from "../stores/UserInfoStore";
 
 let loading = null;
-// console.log(import.meta.env.PROD,import.meta.env.VITE_DOMAIN)
+// 开发环境直接使用真实服务器地址，不使用代理
+const DEV_API_BASE = "http://114.66.38.139:9092";
+console.log(import.meta.env.PROD,import.meta.env.VITE_DOMAIN)
 const instance = axios.create({
-    withCredentials: true,
-    baseURL: (import.meta.env.PROD ? import.meta.env.VITE_DOMAIN : "") + "/api",
+    // withCredentials: true,
+    baseURL: (import.meta.env.PROD ? import.meta.env.VITE_DOMAIN : DEV_API_BASE) + "/api",
     timeout: 10 * 1000
 });
 

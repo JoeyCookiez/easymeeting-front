@@ -30,16 +30,8 @@ export default defineConfig({
     },
     plugins: [vue()],
     server:{
-      historyApiFallback: true,
       hmr: true,
-      port: 7070,
-      proxy:{
-        "/api":{
-          target: "http://localhost:8080",
-          changeOrigin: true,
-          rewrite:(path) => path.replace(/^\/api/,"/api"),
-        }
-      }
+      port: 7070
     }
   }
 })

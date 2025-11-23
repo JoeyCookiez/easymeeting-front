@@ -24,7 +24,7 @@ export function exitMeeting(data){
 
 export function quickMeeting(){
     return request({
-        url: "/meetingInof/quickMeeting",
+        url: "/meetingInfo/quickMeeting",
         method: "post"
     })
 }

@@ -1,6 +1,6 @@
 <template>
     <div class="window-header">
-        <div class="title">EasyMeeting</div>
+        <div class="title">YoMeeting</div>
         <div class="window-controls">
             <button class="control-btn min-btn" @click="minimizeWindow">─</button>
             <button class="control-btn close-btn" @click="handleClose">×</button>

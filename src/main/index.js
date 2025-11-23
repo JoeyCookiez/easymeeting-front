@@ -193,7 +193,7 @@ function createTray() {
     }
   ]);
 
-  tray.setToolTip('EasyMeeting');
+  tray.setToolTip('YoMeeting');
   tray.setContextMenu(contextMenu);
 
   // 点击托盘图标显示窗口
